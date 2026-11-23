@@ -29,6 +29,14 @@ export type AiracCycle = {
   publicationCount: number
 }
 
+export type AttentionItem = {
+  severity: 'critical' | 'warning' | string
+  type: string
+  detail: string
+  title: string
+  href: string
+}
+
 export type DashboardSummary = {
   today: string
   notamsLogged: number
@@ -37,4 +45,5 @@ export type DashboardSummary = {
   openComplaints: number
   overdueTasks: number
   airac: AiracCycle[]
+  needsAttention?: AttentionItem[]
 }

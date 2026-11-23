@@ -26,19 +26,22 @@ public class DashboardController {
   private final ProcessingFileService processingFileService;
   private final ComplaintService complaintService;
   private final TaskService taskService;
+  private final DashboardService dashboardService;
 
   public DashboardController(
       NotamService notamService,
       PublicationService publicationService,
       ProcessingFileService processingFileService,
       ComplaintService complaintService,
-      TaskService taskService
+      TaskService taskService,
+      DashboardService dashboardService
   ) {
     this.notamService = notamService;
     this.publicationService = publicationService;
     this.processingFileService = processingFileService;
     this.complaintService = complaintService;
     this.taskService = taskService;
+    this.dashboardService = dashboardService;
   }
 
   @GetMapping("/summary")
@@ -69,6 +72,7 @@ public class DashboardController {
     summary.put("openComplaints", complaintService.countOpen());
     summary.put("overdueTasks", taskService.countOverdue());
     summary.put("airac", airac);
+    summary.put("needsAttention", dashboardService.needsAttention());
     return summary;
   }
 }
