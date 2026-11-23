@@ -25,6 +25,14 @@ server:
   port: ${PORT:8080}
   error:
     include-stacktrace: never
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        name: ADPSESSION
+        http-only: true
+        same-site: lax
+
 
 management:
   endpoints:

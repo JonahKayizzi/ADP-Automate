@@ -3,6 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppShell } from '@/app/AppShell'
 import { OverviewPage } from '@/features/dashboard/OverviewPage'
 import { PlaceholderPage } from '@/app/PlaceholderPage'
+import { AuthProvider } from '@/features/auth/AuthContext'
+import { AuthGate } from '@/features/auth/AuthGate'
+import { UsersPage } from '@/features/users/UsersPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -16,20 +19,24 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<Navigate to="/overview" replace />} />
-            <Route path="overview" element={<OverviewPage />} />
-            <Route path="notams" element={<PlaceholderPage title="NOTAM publication log" />} />
-            <Route path="publications" element={<PlaceholderPage title="AIP and AIC publications" />} />
-            <Route path="library" element={<PlaceholderPage title="AIS library" />} />
-            <Route path="complaints" element={<PlaceholderPage title="Customer complaints log" />} />
-            <Route path="tasks" element={<PlaceholderPage title="Task list" />} />
-            <Route path="users" element={<PlaceholderPage title="Users" />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <AuthGate>
+            <Routes>
+              <Route element={<AppShell />}>
+                <Route index element={<Navigate to="/overview" replace />} />
+                <Route path="overview" element={<OverviewPage />} />
+                <Route path="notams" element={<PlaceholderPage title="NOTAM publication log" />} />
+                <Route path="publications" element={<PlaceholderPage title="AIP and AIC publications" />} />
+                <Route path="library" element={<PlaceholderPage title="AIS library" />} />
+                <Route path="complaints" element={<PlaceholderPage title="Customer complaints log" />} />
+                <Route path="tasks" element={<PlaceholderPage title="Task list" />} />
+                <Route path="users" element={<UsersPage />} />
+              </Route>
+            </Routes>
+          </AuthGate>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   )
 }

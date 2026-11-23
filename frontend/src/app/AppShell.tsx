@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '@/features/auth/AuthContext'
+import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal'
 
 const nav = [
   { to: '/overview', label: 'Overview' },
@@ -9,10 +12,36 @@ const nav = [
   { to: '/tasks', label: 'Tasks' },
 ]
 
+function roleLabel(role: string) {
+  switch (role) {
+    case 'ADMINISTRATOR':
+      return 'Administrator'
+    case 'EDITOR':
+      return 'Editor'
+    case 'VIEWER':
+      return 'Viewer'
+    default:
+      return role
+  }
+}
+
 export function AppShell() {
+  const { user, lock, signOut } = useAuth()
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const initials = (user?.displayName ?? '?')
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  const links = user?.role === 'ADMINISTRATOR'
+    ? [...nav, { to: '/users', label: 'Users' }]
+    : nav
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
-      <aside className="border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
+      <aside className="flex flex-col border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-white" aria-hidden>
             ✈
@@ -26,7 +55,7 @@ export function AppShell() {
         </div>
 
         <nav className="flex gap-1 overflow-x-auto px-2 pb-3 lg:flex-col lg:overflow-visible" aria-label="Main">
-          {nav.map((item) => (
+          {links.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -42,8 +71,16 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="mt-auto hidden border-t border-slate-100 px-4 py-4 text-xs text-muted lg:block">
-          Safety · Efficiency · Regularity
+        <div className="mt-auto border-t border-slate-100 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-ink">{user?.displayName}</div>
+              <div className="truncate text-xs text-muted">Safety · Efficiency · Regularity</div>
+            </div>
+          </div>
         </div>
       </aside>
 
@@ -56,8 +93,24 @@ export function AppShell() {
             placeholder="Search NOTAM numbers, titles, originators..."
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
-          <div className="font-mono text-xs text-muted">
-            AIRAC setup pending
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <div className="text-ink">
+              <span className="font-semibold">{user?.displayName}</span>
+              <span className="text-muted">
+                {' '}
+                · {roleLabel(user?.role ?? '')}
+                {user?.designation ? ` · ${user.designation}` : ''}
+              </span>
+            </div>
+            <button type="button" className="font-medium text-brand" onClick={() => setChangePasswordOpen(true)}>
+              Change password
+            </button>
+            <button type="button" className="font-medium text-brand" onClick={lock}>
+              Lock
+            </button>
+            <button type="button" className="font-medium text-brand" onClick={() => void signOut()}>
+              Sign out
+            </button>
           </div>
         </header>
 
@@ -65,6 +118,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      <ChangePasswordModal open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </div>
   )
 }
