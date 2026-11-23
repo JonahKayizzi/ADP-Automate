@@ -1,0 +1,8 @@
+{
+  "name": "adp-automate-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test:e2e": "echo \"Playwright suite lands in Phase 5\" && exit 0"
+  }
+}

@@ -1,0 +1,35 @@
+# Dependencies / build
+node_modules/
+dist/
+build/
+target/
+*.class
+*.jar
+!**/src/main/**/resources/**
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Uploads & local data
+data/
+uploads/
+*.log
+
+# Test / coverage
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# Java
+.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*
