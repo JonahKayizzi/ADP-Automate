@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import * as notamApi from '@/services/notamApi'
+import * as publicationApi from '@/services/publicationApi'
 import type { AiracCycle } from '@/types/notam'
 
 function formatDate(iso: string) {
@@ -23,9 +24,7 @@ function AiracCard({ cycle }: { cycle: AiracCycle }) {
         ) : null}
       </div>
       <p className="mt-2 text-xs text-muted">Effective {formatDate(cycle.effective)}</p>
-      {cycle.inForce ? (
-        <p className="mt-1 text-xs text-muted">No AIRAC publications yet</p>
-      ) : deadlinePassed ? (
+      {cycle.inForce ? null : deadlinePassed ? (
         <p className="mt-1 text-xs font-semibold text-danger">
           Distribution deadline passed {formatDate(cycle.distributeBy)}
         </p>
@@ -43,10 +42,20 @@ function AiracCard({ cycle }: { cycle: AiracCycle }) {
   )
 }
 
+function statusChipClass(status: string) {
+  if (status === 'Distributed') return 'bg-emerald-50 text-ok'
+  if (status === 'Cancelled') return 'bg-slate-100 text-slate-600'
+  return 'bg-amber-50 text-warn'
+}
+
 export function OverviewPage() {
   const summary = useQuery({
     queryKey: ['dashboard'],
     queryFn: notamApi.fetchDashboardSummary,
+  })
+  const publications = useQuery({
+    queryKey: ['publications'],
+    queryFn: publicationApi.listPublications,
   })
 
   const tiles = [
@@ -59,6 +68,10 @@ export function OverviewPage() {
 
   const airac = summary.data?.airac ?? []
   const day = airac[0]?.dayWithinCycle
+  const today = summary.data?.today ?? ''
+  const comingIntoEffect = (publications.data ?? [])
+    .filter((p) => p.status !== 'Cancelled' && p.effective >= today)
+    .slice(0, 6)
 
   return (
     <section className="space-y-6">
@@ -100,6 +113,47 @@ export function OverviewPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-display text-lg font-semibold">Needs attention</h2>
         <p className="mt-2 text-sm text-muted">Nothing overdue or incomplete yet.</p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-semibold">Coming into effect</h2>
+          <Link to="/publications" className="text-sm font-medium text-brand">
+            All publications
+          </Link>
+        </div>
+        {comingIntoEffect.length === 0 ? (
+          <p className="text-sm text-muted">No upcoming publications.</p>
+        ) : (
+          <ul className="space-y-3">
+            {comingIntoEffect.map((pub) => (
+              <li key={pub.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {pub.airacIdent ? (
+                      <span className="rounded bg-pink-50 px-2 py-0.5 font-mono text-xs font-semibold text-airac">
+                        {pub.airacIdent}
+                      </span>
+                    ) : (
+                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-muted">
+                        {formatDate(pub.effective).slice(0, 6)}
+                      </span>
+                    )}
+                    <span className="font-semibold text-ink">
+                      {pub.type} {pub.number}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    {pub.title} · {formatDate(pub.effective)}
+                  </p>
+                </div>
+                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${statusChipClass(pub.status)}`}>
+                  {pub.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   )

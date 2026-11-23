@@ -7,6 +7,7 @@ import { AuthProvider } from '@/features/auth/AuthContext'
 import { AuthGate } from '@/features/auth/AuthGate'
 import { UsersPage } from '@/features/users/UsersPage'
 import { NotamsPage } from '@/features/notams/NotamsPage'
+import { PublicationsPage } from '@/features/publications/PublicationsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,7 +29,7 @@ export default function App() {
                 <Route index element={<Navigate to="/overview" replace />} />
                 <Route path="overview" element={<OverviewPage />} />
                 <Route path="notams" element={<NotamsPage />} />
-                <Route path="publications" element={<PlaceholderPage title="AIP and AIC publications" />} />
+                <Route path="publications" element={<PublicationsPage />} />
                 <Route path="library" element={<PlaceholderPage title="AIS library" />} />
                 <Route path="complaints" element={<PlaceholderPage title="Customer complaints log" />} />
                 <Route path="tasks" element={<PlaceholderPage title="Task list" />} />
