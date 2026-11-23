@@ -39,11 +39,13 @@ If the build says `"/pom.xml": not found` or `"/src": not found`, the context is
 | `CORS_ORIGINS` | Your frontend URL, e.g. `https://adp-automate-1.onrender.com` |
 | `SESSION_COOKIE_SAME_SITE` | `none` (required: frontend and API are different hosts) |
 | `SESSION_COOKIE_SECURE` | `true` |
-| `UPLOAD_DIR` | `/var/data/uploads` (if you attach a Disk) |
+| `UPLOAD_DIR` | `/var/data/uploads` (Docker image creates this; attach a Disk at `/var/data` for persistence) |
 
 `PORT` is set by Render automatically. Session cookies become `Secure` + `SameSite=None` when Render’s `RENDER` env is present.
 
-Optional: attach a **persistent disk** at `/var/data` for uploads later.
+If a deploy fails with `Cannot create upload directory` / `AccessDeniedException`, the running user cannot write the upload path — redeploy a build that pre-creates `/var/data/uploads`, or set `UPLOAD_DIR` to a writable path.
+
+Optional: attach a **persistent disk** at `/var/data` so uploads survive restarts.
 
 ### 3. Frontend static site
 
