@@ -1,13 +1,64 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import * as notamApi from '@/services/notamApi'
+import type { AiracCycle } from '@/types/notam'
 
-async function fetchPing() {
-  const res = await fetch('/api/ping')
-  if (!res.ok) throw new Error('API unavailable')
-  return res.json() as Promise<{ status: string; service: string; version: string }>
+function formatDate(iso: string) {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(iso + 'T00:00:00Z'))
+}
+
+function AiracCard({ cycle }: { cycle: AiracCycle }) {
+  const deadlinePassed = cycle.daysToDeadline < 0
+  return (
+    <div className={`rounded-lg border p-3 ${cycle.inForce ? 'border-airac/40 bg-pink-50/40' : 'border-slate-200 bg-white'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-sm font-semibold text-airac">{cycle.ident}</span>
+        {cycle.inForce ? (
+          <span className="text-[10px] font-bold uppercase tracking-wide text-airac">In force</span>
+        ) : null}
+      </div>
+      <p className="mt-2 text-xs text-muted">Effective {formatDate(cycle.effective)}</p>
+      {cycle.inForce ? (
+        <p className="mt-1 text-xs text-muted">No AIRAC publications yet</p>
+      ) : deadlinePassed ? (
+        <p className="mt-1 text-xs font-semibold text-danger">
+          Distribution deadline passed {formatDate(cycle.distributeBy)}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted">
+          Distribute by <strong>{formatDate(cycle.distributeBy)}</strong>
+          {' · '}
+          {cycle.daysToDeadline} days
+        </p>
+      )}
+      <p className="mt-1 text-xs text-muted">
+        {cycle.publicationCount} AIRAC publication{cycle.publicationCount === 1 ? '' : 's'}
+      </p>
+    </div>
+  )
 }
 
 export function OverviewPage() {
-  const ping = useQuery({ queryKey: ['ping'], queryFn: fetchPing, retry: false })
+  const summary = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: notamApi.fetchDashboardSummary,
+  })
+
+  const tiles = [
+    { label: 'NOTAMs logged', value: summary.data?.notamsLogged ?? '—', to: '/notams' },
+    { label: 'Processing files not signed off', value: summary.data?.processingFilesNotSignedOff ?? 0, to: '/notams' },
+    { label: 'Publications not yet effective', value: summary.data?.publicationsNotYetEffective ?? 0, to: '/publications' },
+    { label: 'Open complaints', value: summary.data?.openComplaints ?? 0, to: '/complaints' },
+    { label: 'Overdue tasks', value: summary.data?.overdueTasks ?? 0, to: '/tasks' },
+  ]
+
+  const airac = summary.data?.airac ?? []
+  const day = airac[0]?.dayWithinCycle
 
   return (
     <section className="space-y-6">
@@ -19,19 +70,36 @@ export function OverviewPage() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="font-display text-lg font-semibold">Foundation status</h2>
-        <p className="mt-2 text-sm text-muted">
-          Phase 1 scaffolds the monorepo, API health check and shell UI. Domain modules follow.
-        </p>
-        <div className="mt-4 rounded-md bg-slate-50 px-3 py-2 font-mono text-sm">
-          {ping.isLoading && 'Checking API…'}
-          {ping.isError && 'API offline — start the Spring Boot backend on :8080'}
-          {ping.data && (
-            <span>
-              API {ping.data.status} · {ping.data.service} · {ping.data.version}
-            </span>
-          )}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-lg font-semibold">AIRAC cycle</h2>
+          <p className="text-xs text-muted">
+            {day != null ? `Day ${day} of 28` : '…'} · distribution deadline is 42 days before the effective date
+          </p>
         </div>
+        {summary.isLoading ? <p className="text-sm text-muted">Loading AIRAC…</p> : null}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {airac.map((cycle) => (
+            <AiracCard key={cycle.ident} cycle={cycle} />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {tiles.map((tile) => (
+          <Link
+            key={tile.label}
+            to={tile.to}
+            className="rounded-xl border border-slate-200 bg-white p-4 hover:border-brand/40"
+          >
+            <div className="font-display text-3xl font-semibold text-ink">{tile.value}</div>
+            <div className="mt-1 text-sm text-muted">{tile.label}</div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="font-display text-lg font-semibold">Needs attention</h2>
+        <p className="mt-2 text-sm text-muted">Nothing overdue or incomplete yet.</p>
       </div>
     </section>
   )

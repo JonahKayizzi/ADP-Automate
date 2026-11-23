@@ -1,7 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal'
+import { fetchAiracCurrent } from '@/services/notamApi'
 
 const nav = [
   { to: '/overview', label: 'Overview' },
@@ -28,12 +30,21 @@ function roleLabel(role: string) {
 export function AppShell() {
   const { user, lock, signOut } = useAuth()
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const airac = useQuery({ queryKey: ['airac-current'], queryFn: fetchAiracCurrent })
   const initials = (user?.displayName ?? '?')
     .split(/\s+/)
     .map((part) => part[0])
     .join('')
     .slice(0, 2)
     .toUpperCase()
+
+  const dateLabel = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Africa/Kampala',
+  }).format(new Date())
 
   const links = user?.role === 'ADMINISTRATOR'
     ? [...nav, { to: '/users', label: 'Users' }]
@@ -94,6 +105,15 @@ export function AppShell() {
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap items-center gap-3 text-sm">
+            <div className="font-mono text-xs text-muted">
+              {dateLabel}
+              {airac.data ? (
+                <>
+                  {' · AIRAC '}
+                  <span className="font-semibold text-airac">{airac.data.ident}</span>
+                </>
+              ) : null}
+            </div>
             <div className="text-ink">
               <span className="font-semibold">{user?.displayName}</span>
               <span className="text-muted">
