@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { AttachmentsPanel } from '@/features/attachments/AttachmentsPanel'
+import { ProcessingFilePanel } from '@/features/processing/ProcessingFilePanel'
 import { useAuth } from '@/features/auth/AuthContext'
 import { ApiError } from '@/services/api'
 import * as publicationApi from '@/services/publicationApi'
@@ -253,10 +255,19 @@ export function PublicationsPage() {
               ) : null}
             </div>
             {pub.status !== 'Cancelled' ? (
-              <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted">
-                Processing file · {pub.type.replace(/^AIRAC /, '')} — forms arrive in the next slice.
-              </div>
+              <ProcessingFilePanel
+                ownerType="publication"
+                ownerId={pub.id}
+                canEdit={canEdit}
+                label={pub.type.replace(/^AIRAC /, '')}
+              />
             ) : null}
+            <AttachmentsPanel
+              ownerType="publication"
+              ownerId={pub.id}
+              canEdit={canEdit}
+              emptyHint="No file attached"
+            />
           </article>
         ))}
       </div>

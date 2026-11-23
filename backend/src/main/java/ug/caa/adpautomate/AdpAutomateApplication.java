@@ -11,6 +11,7 @@ public class AdpAutomateApplication {
   public static void main(String[] args) {
     // Render injects postgres:// DATABASE_URL; Spring JDBC requires jdbc:postgresql://
     applyDatabaseUrlFromEnvironment();
+    applyRenderSessionCookieSettings();
     SpringApplication.run(AdpAutomateApplication.class, args);
   }
 
@@ -29,5 +30,21 @@ public class AdpAutomateApplication {
       System.setProperty("spring.datasource.password", converted.password());
       System.setProperty("DATABASE_PASSWORD", converted.password());
     }
+  }
+
+  /**
+   * Frontend and API are on different Render hosts, so the session cookie must be
+   * {@code SameSite=None; Secure} or the browser will not send it (401 on /api/*).
+   */
+  static void applyRenderSessionCookieSettings() {
+    boolean onRender = "true".equalsIgnoreCase(System.getenv("RENDER"))
+        || System.getenv("RENDER_SERVICE_ID") != null;
+    if (!onRender) {
+      return;
+    }
+    System.setProperty("SESSION_COOKIE_SAME_SITE", "none");
+    System.setProperty("SESSION_COOKIE_SECURE", "true");
+    System.setProperty("server.servlet.session.cookie.same-site", "none");
+    System.setProperty("server.servlet.session.cookie.secure", "true");
   }
 }

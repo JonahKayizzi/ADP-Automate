@@ -36,7 +36,9 @@ If the build says `"/pom.xml": not found` or `"/src": not found`, the context is
 | Key | Value |
 | --- | --- |
 | `DATABASE_URL` | Paste Render Postgres **External Database URL** |
-| `CORS_ORIGINS` | Your frontend URL, e.g. `https://adp-automate-web.onrender.com` |
+| `CORS_ORIGINS` | Your frontend URL, e.g. `https://adp-automate-1.onrender.com` |
+| `SESSION_COOKIE_SAME_SITE` | `none` (required: frontend and API are different hosts) |
+| `SESSION_COOKIE_SECURE` | `true` |
 | `UPLOAD_DIR` | `/var/data/uploads` (if you attach a Disk) |
 
 `PORT` is set by Render automatically. Session cookies become `Secure` + `SameSite=None` when Render’s `RENDER` env is present.

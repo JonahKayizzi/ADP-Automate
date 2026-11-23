@@ -6,7 +6,10 @@ import org.springframework.web.bind.annotation.RestController;
 import ug.caa.adpautomate.airac.AiracCalendar;
 import ug.caa.adpautomate.airac.AiracController;
 import ug.caa.adpautomate.notam.NotamService;
+import ug.caa.adpautomate.complaint.ComplaintService;
+import ug.caa.adpautomate.processing.ProcessingFileService;
 import ug.caa.adpautomate.publication.PublicationService;
+import ug.caa.adpautomate.task.TaskService;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -20,10 +23,22 @@ public class DashboardController {
 
   private final NotamService notamService;
   private final PublicationService publicationService;
+  private final ProcessingFileService processingFileService;
+  private final ComplaintService complaintService;
+  private final TaskService taskService;
 
-  public DashboardController(NotamService notamService, PublicationService publicationService) {
+  public DashboardController(
+      NotamService notamService,
+      PublicationService publicationService,
+      ProcessingFileService processingFileService,
+      ComplaintService complaintService,
+      TaskService taskService
+  ) {
     this.notamService = notamService;
     this.publicationService = publicationService;
+    this.processingFileService = processingFileService;
+    this.complaintService = complaintService;
+    this.taskService = taskService;
   }
 
   @GetMapping("/summary")
@@ -49,10 +64,10 @@ public class DashboardController {
     Map<String, Object> summary = new LinkedHashMap<>();
     summary.put("today", today.toString());
     summary.put("notamsLogged", notamService.countActive());
-    summary.put("processingFilesNotSignedOff", 0);
+    summary.put("processingFilesNotSignedOff", processingFileService.countNotFullySignedOff());
     summary.put("publicationsNotYetEffective", publicationService.countNotYetEffective());
-    summary.put("openComplaints", 0);
-    summary.put("overdueTasks", 0);
+    summary.put("openComplaints", complaintService.countOpen());
+    summary.put("overdueTasks", taskService.countOverdue());
     summary.put("airac", airac);
     return summary;
   }
