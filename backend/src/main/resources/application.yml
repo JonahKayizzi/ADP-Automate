@@ -2,7 +2,8 @@ spring:
   application:
     name: adp-automate
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/adp_automate}
+    # Prefer JDBC_DATABASE_URL. Render's DATABASE_URL (postgres://...) is converted at startup.
+    url: ${JDBC_DATABASE_URL:jdbc:postgresql://localhost:5432/adp_automate}
     username: ${DATABASE_USER:adp}
     password: ${DATABASE_PASSWORD:adp}
   jpa:

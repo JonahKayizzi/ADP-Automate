@@ -17,7 +17,9 @@ Repo: `JonahKayizzi/ADP-Automate` · deploy from branch **`dev`**.
 2. Name: `adp-automate-db`.
 3. Copy **External Database URL** (starts with `postgres://…`).
 
-The API accepts that URL as-is via `DATABASE_URL` (converted to JDBC + `sslmode=require`).
+Paste that URL into the API service as `DATABASE_URL`. The app converts `postgres://…` to JDBC (`jdbc:postgresql://…?sslmode=require`) at startup.
+
+If a deploy fails with `URL must start with 'jdbc'`, ensure the latest `dev` commit is deployed and use **Clear build cache & deploy** once so Docker does not reuse an old jar.
 
 ### 2. Backend web service
 

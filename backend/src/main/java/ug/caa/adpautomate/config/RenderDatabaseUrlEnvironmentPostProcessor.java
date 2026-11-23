@@ -6,10 +6,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,39 +17,29 @@ public class RenderDatabaseUrlEnvironmentPostProcessor implements EnvironmentPos
 
   @Override
   public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-    String raw = environment.getProperty("DATABASE_URL");
-    if (raw == null || raw.isBlank()) {
-      return;
-    }
-
     Map<String, Object> props = new HashMap<>();
+
     boolean onRender = "true".equalsIgnoreCase(environment.getProperty("RENDER"))
         || environment.getProperty("RENDER_SERVICE_ID") != null;
 
-    if (raw.startsWith("postgres://") || raw.startsWith("postgresql://")) {
-      try {
-        URI uri = new URI(raw.replaceFirst("^postgres://", "postgresql://"));
-        String userInfo = uri.getUserInfo();
-        if (userInfo != null && !userInfo.isBlank()) {
-          String[] parts = userInfo.split(":", 2);
-          props.put("spring.datasource.username", decode(parts[0]));
-          if (parts.length > 1) {
-            props.put("spring.datasource.password", decode(parts[1]));
-          }
-        }
-        String path = uri.getPath() == null ? "" : uri.getPath();
-        String database = path.startsWith("/") ? path.substring(1) : path;
-        int port = uri.getPort() > 0 ? uri.getPort() : 5432;
-        String jdbc = "jdbc:postgresql://" + uri.getHost() + ":" + port + "/" + database;
-        if (onRender || raw.contains("render.com") || uri.getHost() != null && uri.getHost().contains("render.com")) {
-          jdbc = jdbc + "?sslmode=require";
-        }
-        props.put("spring.datasource.url", jdbc);
-      } catch (URISyntaxException ex) {
-        throw new IllegalStateException("Invalid DATABASE_URL", ex);
+    DatabaseUrlSupport.Converted converted = DatabaseUrlSupport.convert(environment.getProperty("DATABASE_URL"));
+    if (converted != null) {
+      props.put("spring.datasource.url", converted.jdbcUrl());
+      props.put("JDBC_DATABASE_URL", converted.jdbcUrl());
+      if (converted.username() != null) {
+        props.put("spring.datasource.username", converted.username());
+        props.put("DATABASE_USER", converted.username());
       }
-    } else if (raw.startsWith("jdbc:postgresql://") && onRender && !raw.contains("sslmode=")) {
-      props.put("spring.datasource.url", raw + (raw.contains("?") ? "&" : "?") + "sslmode=require");
+      if (converted.password() != null) {
+        props.put("spring.datasource.password", converted.password());
+        props.put("DATABASE_PASSWORD", converted.password());
+      }
+    } else if (onRender) {
+      String jdbc = environment.getProperty("JDBC_DATABASE_URL");
+      if (jdbc != null && jdbc.startsWith("jdbc:postgresql://") && !jdbc.contains("sslmode=")) {
+        props.put("spring.datasource.url", jdbc + (jdbc.contains("?") ? "&" : "?") + "sslmode=require");
+        props.put("JDBC_DATABASE_URL", props.get("spring.datasource.url"));
+      }
     }
 
     if (onRender) {
@@ -65,10 +51,6 @@ public class RenderDatabaseUrlEnvironmentPostProcessor implements EnvironmentPos
     if (!props.isEmpty()) {
       environment.getPropertySources().addFirst(new MapPropertySource("renderDatabaseUrl", props));
     }
-  }
-
-  private static String decode(String value) {
-    return URLDecoder.decode(value, StandardCharsets.UTF_8);
   }
 
   @Override
