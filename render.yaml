@@ -14,7 +14,7 @@ services:
     plan: free
     branch: dev
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     healthCheckPath: /actuator/health
     envVars:
       - key: DATABASE_URL

@@ -23,8 +23,11 @@ The API accepts that URL as-is via `DATABASE_URL` (converted to JDBC + `sslmode=
 
 1. **New** → **Web Service** → this repo → branch **`dev`**.
 2. Runtime: **Docker**.
-3. Dockerfile path: `backend/Dockerfile` · Docker context: `backend`.
-4. Health check path: `/actuator/health`.
+3. Dockerfile path: `./backend/Dockerfile`
+4. Docker build context directory: `.` (repository root — required so `backend/pom.xml` is visible)
+5. Health check path: `/actuator/health`.
+
+If the build says `"/pom.xml": not found` or `"/src": not found`, the context is wrong — set it to `.`, not `backend`.
 
 **Environment**
 
