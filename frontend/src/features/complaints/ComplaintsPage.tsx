@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '@/features/auth/AuthContext'
+import { focusClass, useFocusRecord } from '@/hooks/useFocusRecord'
 import { ApiError } from '@/services/api'
 import * as complaintsApi from '@/services/complaintsApi'
 import type { Complaint, UpsertComplaint } from '@/types/complaint'
@@ -31,6 +32,7 @@ const emptyForm = (): UpsertComplaint => ({
 export function ComplaintsPage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'VIEWER'
+  const focusId = useFocusRecord()
   const qc = useQueryClient()
   const [filter, setFilter] = useState('Open')
   const [open, setOpen] = useState(false)
@@ -146,7 +148,11 @@ export function ComplaintsPage() {
 
       <div className="space-y-3">
         {rows.map((row) => (
-          <article key={row.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <article
+            id={`record-${row.id}`}
+            key={row.id}
+            className={`rounded-xl border border-slate-200 bg-white p-4 ${focusClass(focusId, row.id)}`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

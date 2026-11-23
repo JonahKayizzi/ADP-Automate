@@ -7,6 +7,12 @@ import * as publicationApi from '@/services/publicationApi'
 import * as searchApi from '@/services/searchApi'
 import type { AiracCycle, AttentionItem } from '@/types/notam'
 
+function hitHref(href: string, id: string) {
+  const url = new URL(href, window.location.origin)
+  url.searchParams.set('focus', id)
+  return `${url.pathname}${url.search}`
+}
+
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
@@ -60,6 +66,7 @@ const groupLabels: Record<string, string> = {
 }
 
 function SearchResults({ query }: { query: string }) {
+  const { setQuery } = useSearch()
   const deferred = useDeferredValue(query.trim())
   const results = useQuery({
     queryKey: ['search', deferred],
@@ -95,7 +102,8 @@ function SearchResults({ query }: { query: string }) {
             {group.hits.map((hit) => (
               <li key={`${hit.type}-${hit.id}`}>
                 <Link
-                  to={hit.href}
+                  to={hitHref(hit.href, hit.id)}
+                  onClick={() => setQuery('')}
                   className="block rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-brand/40"
                 >
                   <p className="text-sm font-semibold text-ink">{hit.title}</p>
