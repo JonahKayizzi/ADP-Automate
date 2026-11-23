@@ -25,13 +25,15 @@ server:
   port: ${PORT:8080}
   error:
     include-stacktrace: never
+  forward-headers-strategy: framework
   servlet:
     session:
       timeout: 8h
       cookie:
         name: ADPSESSION
         http-only: true
-        same-site: lax
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}
+        secure: ${SESSION_COOKIE_SECURE:false}
 
 
 management:
