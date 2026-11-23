@@ -1,30 +1,73 @@
-# Deploying to Render
+# Deploying ADP Automate to Render (staging)
 
-## Services
+Repo: `JonahKayizzi/ADP-Automate` · deploy from branch **`dev`**.
 
-1. **PostgreSQL** — Render Postgres. Copy the Internal Database URL.
-2. **Backend** — Web Service from `backend/Dockerfile` (or Maven native build).
-3. **Frontend** — Static site from `frontend` (`npm run build`, publish `dist`) **or** Docker image with Nginx.
+## Option A — Blueprint (fastest)
 
-## Backend env
+1. Open [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+2. Connect GitHub and select **ADP-Automate**.
+3. Use `render.yaml` from `dev`.
+4. After services appear, set env vars (see below), then redeploy.
 
-| Variable | Notes |
+## Option B — Manual (three resources)
+
+### 1. PostgreSQL
+
+1. **New** → **PostgreSQL** (Free is fine for staging).
+2. Name: `adp-automate-db`.
+3. Copy **External Database URL** (starts with `postgres://…`).
+
+Paste that URL into the API service as `DATABASE_URL`. The app converts `postgres://…` to JDBC (`jdbc:postgresql://…?sslmode=require`) at startup.
+
+If a deploy fails with `URL must start with 'jdbc'`, ensure the latest `dev` commit is deployed and use **Clear build cache & deploy** once so Docker does not reuse an old jar.
+
+### 2. Backend web service
+
+1. **New** → **Web Service** → this repo → branch **`dev`**.
+2. Runtime: **Docker**.
+3. Dockerfile path: `./backend/Dockerfile`
+4. Docker build context directory: `.` (repository root — required so `backend/pom.xml` is visible)
+5. Health check path: `/actuator/health`.
+
+If the build says `"/pom.xml": not found` or `"/src": not found`, the context is wrong — set it to `.`, not `backend`.
+
+**Environment**
+
+| Key | Value |
 | --- | --- |
-| `DATABASE_URL` | Must be JDBC: `jdbc:postgresql://HOST:5432/DB` |
-| `DATABASE_USER` | From Render |
-| `DATABASE_PASSWORD` | From Render |
-| `CORS_ORIGINS` | Frontend origin, e.g. `https://adp-automate.onrender.com` |
-| `UPLOAD_DIR` | Persistent disk mount path if using Render Disk |
-| `PORT` | Render sets this automatically |
+| `DATABASE_URL` | Paste Render Postgres **External Database URL** |
+| `CORS_ORIGINS` | Your frontend URL, e.g. `https://adp-automate-1.onrender.com` |
+| `SESSION_COOKIE_SAME_SITE` | `none` (required: frontend and API are different hosts) |
+| `SESSION_COOKIE_SECURE` | `true` |
+| `UPLOAD_DIR` | `/var/data/uploads` (if you attach a Disk) |
 
-Render’s `postgres://user:pass@host/db` URL must be converted to JDBC form.
+`PORT` is set by Render automatically. Session cookies become `Secure` + `SameSite=None` when Render’s `RENDER` env is present.
 
-## Frontend env (build-time)
+Optional: attach a **persistent disk** at `/var/data` for uploads later.
 
-| Variable | Notes |
+### 3. Frontend static site
+
+1. **New** → **Static Site** → same repo → branch **`dev`**.
+2. Build command: `cd frontend && npm ci && npm run build`
+3. Publish directory: `frontend/dist`
+4. Add a rewrite: `/*` → `/index.html` (SPA).
+
+**Build env**
+
+| Key | Value |
 | --- | --- |
-| `VITE_API_BASE_URL` | Public backend URL + `/api`, or `/api` if same origin via proxy |
+| `VITE_API_BASE_URL` | `https://<your-api-service>.onrender.com/api` |
 
-## Suggested next step
+Redeploy the frontend after the API URL is known.
 
-Create the three Render resources and paste the service URLs / DB credentials back into this chat so CI deploy workflows can be wired.
+## Verify
+
+1. `https://<api>.onrender.com/actuator/health` → `UP`
+2. `https://<api>.onrender.com/api/ping` → `status: ok`
+3. Open the static site → create admin / sign in (first deploy with empty DB shows setup).
+
+Free Render services spin down when idle; first request can take ~30–60s.
+
+## After it works
+
+Paste both public URLs here so we can tighten CORS and note them in the README.

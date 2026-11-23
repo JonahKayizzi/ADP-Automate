@@ -1,12 +1,34 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
+import { AttachmentsPanel } from '@/features/attachments/AttachmentsPanel'
+import { ProcessingFilePanel } from '@/features/processing/ProcessingFilePanel'
 import { useAuth } from '@/features/auth/AuthContext'
 import { ApiError } from '@/services/api'
 import * as notamApi from '@/services/notamApi'
+import * as processingApi from '@/services/processingApi'
 import type { Notam, UpsertNotam } from '@/types/notam'
 
 function todayIso() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Kampala' }).format(new Date())
+}
+
+function IncompleteBanner({ notamIds }: { notamIds: string[] }) {
+  const results = useQueries({
+    queries: notamIds.map((id) => ({
+      queryKey: ['processing-file', 'notam', id],
+      queryFn: () => processingApi.getProcessingFile('notam', id),
+    })),
+  })
+  const incomplete = results.filter(
+    (r) => r.data && r.data.signedOffCount < r.data.totalForms
+  ).length
+  if (incomplete === 0) return null
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      {incomplete} NOTAM{incomplete === 1 ? '' : 's'} {incomplete === 1 ? 'has' : 'have'} a processing
+      file that is not fully signed off.
+    </div>
+  )
 }
 
 function formatIssued(iso: string) {
@@ -104,8 +126,7 @@ export function NotamsPage() {
         <div>
           <h1 className="font-display text-3xl font-semibold text-ink">NOTAM publication log</h1>
           <p className="mt-2 max-w-3xl text-muted">
-            Each NOTAM will carry its processing file in a later phase: raw data quality check, metadata,
-            processing and product quality check.
+            Each NOTAM carries its four-step processing file (OF/82–83d) plus supporting attachments.
           </p>
         </div>
         {canEdit ? (
@@ -121,6 +142,8 @@ export function NotamsPage() {
 
       {notams.isLoading ? <p className="text-sm text-muted">Loading NOTAMs…</p> : null}
       {notams.isError ? <p className="text-sm text-danger">Could not load NOTAMs.</p> : null}
+
+      {rows.length > 0 ? <IncompleteBanner notamIds={rows.map((n) => n.id)} /> : null}
 
       {!notams.isLoading && rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-muted">
@@ -176,9 +199,13 @@ export function NotamsPage() {
                 </div>
               ) : null}
             </div>
-            <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-muted">
-              Processing file panel arrives with the OF/82–83d forms in the next slice.
-            </div>
+            <ProcessingFilePanel ownerType="notam" ownerId={notam.id} canEdit={canEdit} />
+            <AttachmentsPanel
+              ownerType="notam"
+              ownerId={notam.id}
+              canEdit={canEdit}
+              emptyHint="No supporting document or NOTAM product file attached yet."
+            />
           </article>
         ))}
       </div>

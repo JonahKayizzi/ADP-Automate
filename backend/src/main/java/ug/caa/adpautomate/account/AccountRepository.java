@@ -14,4 +14,6 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
   long countByActiveTrueAndRole(AccountRole role);
 
   List<Account> findAllByOrderByActiveDescDisplayNameAsc();
+
+  List<Account> findByActiveTrueOrderByDisplayNameAsc();
 }

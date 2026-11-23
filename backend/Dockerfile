@@ -1,7 +1,10 @@
+# Build with Docker context = repository root (Render default).
+# Example: docker build -f backend/Dockerfile .
+
 FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /workspace
-COPY pom.xml .
-COPY src ./src
+COPY backend/pom.xml ./pom.xml
+COPY backend/src ./src
 RUN mvn -q -DskipTests package && mv target/*.jar app.jar
 
 FROM eclipse-temurin:17-jre-jammy

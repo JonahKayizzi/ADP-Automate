@@ -62,12 +62,23 @@ public class SecurityConfig {
   }
 
   @Bean
-  CorsConfigurationSource corsConfigurationSource() {
+  CorsConfigurationSource corsConfigurationSource(
+      org.springframework.core.env.Environment environment
+  ) {
     CorsConfiguration config = new CorsConfiguration();
+    String configured = environment.getProperty("CORS_ORIGINS", "http://localhost:5173");
+    List<String> origins = List.of(configured.split(","));
+    // Patterns keep localhost + Render working; exact origins from env are also allowed.
     config.setAllowedOriginPatterns(List.of(
         "http://localhost:*",
         "https://*.onrender.com"
     ));
+    for (String origin : origins) {
+      String trimmed = origin.trim();
+      if (!trimmed.isEmpty()) {
+        config.addAllowedOriginPattern(trimmed);
+      }
+    }
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
     config.setAllowCredentials(true);
