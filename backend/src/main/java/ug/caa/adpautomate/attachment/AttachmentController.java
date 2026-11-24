@@ -40,6 +40,14 @@ public class AttachmentController {
     return attachmentService.list(ownerType, ownerId);
   }
 
+  @GetMapping("/history")
+  public List<AttachmentResponse> history(
+      @RequestParam String ownerType,
+      @RequestParam UUID ownerId
+  ) {
+    return attachmentService.listHistory(ownerType, ownerId);
+  }
+
   @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   @ResponseStatus(HttpStatus.CREATED)
   public AttachmentResponse upload(
@@ -53,7 +61,7 @@ public class AttachmentController {
 
   @GetMapping("/{id}/download")
   public ResponseEntity<Resource> download(@PathVariable UUID id) {
-    LoadedAttachment loaded = attachmentService.download(id);
+    LoadedAttachment loaded = attachmentService.downloadAny(id);
     Attachment attachment = loaded.attachment();
     ContentDisposition disposition = ContentDisposition.attachment()
         .filename(attachment.getOriginalFilename(), StandardCharsets.UTF_8)

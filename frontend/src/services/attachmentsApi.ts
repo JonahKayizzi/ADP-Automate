@@ -8,6 +8,11 @@ export function listAttachments(ownerType: AttachmentOwnerType, ownerId: string)
   return api<Attachment[]>(`/attachments?${q}`)
 }
 
+export function listAttachmentHistory(ownerType: AttachmentOwnerType, ownerId: string) {
+  const q = new URLSearchParams({ ownerType, ownerId })
+  return api<Attachment[]>(`/attachments/history?${q}`)
+}
+
 export async function uploadAttachment(
   ownerType: AttachmentOwnerType,
   ownerId: string,

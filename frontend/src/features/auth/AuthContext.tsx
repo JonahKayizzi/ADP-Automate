@@ -11,8 +11,12 @@ import type { AuthUser } from '@/types/auth'
 import * as authApi from '@/services/authApi'
 import { ApiError } from '@/services/api'
 import {
+  clearSignedIn,
   getLastActivity,
+  getSignedInAt,
   IDLE_LOCK_MS,
+  markSignedIn,
+  SESSION_MAX_MS,
   setLastUsername,
   touchActivity,
 } from './authStorage'
@@ -118,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(created)
     setSetupRequired(false)
     setLocked(false)
-    touchActivity()
+    markSignedIn()
   }, [])
 
   const signIn = useCallback(async (username: string, password: string) => {
@@ -127,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user)
     setSetupRequired(false)
     setLocked(false)
-    touchActivity()
+    markSignedIn()
   }, [])
 
   const signOut = useCallback(async () => {
@@ -136,9 +140,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Session may already be gone.
     }
+    clearSignedIn()
     setUser(null)
     setLocked(false)
   }, [])
+
+  useEffect(() => {
+    if (!user || user.mustChange) return
+    const timer = window.setInterval(() => {
+      const signedInAt = getSignedInAt()
+      if (signedInAt != null && Date.now() - signedInAt >= SESSION_MAX_MS) {
+        void signOut()
+      }
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [user, signOut])
 
   const lock = useCallback(() => setLocked(true), [])
 

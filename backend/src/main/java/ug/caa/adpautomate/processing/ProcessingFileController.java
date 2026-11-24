@@ -10,10 +10,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.FormDetail;
+import ug.caa.adpautomate.processing.dto.ProcessingDtos.FormRevisionResponse;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.ProcessingFileResponse;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.SaveFormRequest;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.SignRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -61,5 +63,13 @@ public class ProcessingFileController {
   @PostMapping("/{fileId}/forms/{formId}/revise")
   public FormDetail revise(@PathVariable UUID fileId, @PathVariable UUID formId) {
     return processingFileService.revise(fileId, formId);
+  }
+
+  @GetMapping("/{fileId}/forms/{formId}/revisions")
+  public List<FormRevisionResponse> listRevisions(
+      @PathVariable UUID fileId,
+      @PathVariable UUID formId
+  ) {
+    return processingFileService.listRevisions(fileId, formId);
   }
 }

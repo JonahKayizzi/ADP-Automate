@@ -5,6 +5,10 @@
   --font-sans: "Source Sans 3", "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
+  /* Spec breakpoints: nav <900px, forms <560px */
+  --breakpoint-nav: 56.25rem;
+  --breakpoint-compact: 35rem;
+
   --color-brand: #0b3d6e;
   --color-brand-dark: #072a4d;
   --color-airac: #9b1b4d;
@@ -14,6 +18,22 @@
   --color-surface: #f4f6f8;
   --color-ink: #142033;
   --color-muted: #5b6575;
+  --color-panel: #ffffff;
+  --color-border: #e2e8f0;
+}
+
+html[data-theme="dark"] {
+  --color-brand: #7eb6e8;
+  --color-brand-dark: #9ec9ef;
+  --color-airac: #e8a0bc;
+  --color-ok: #6dcaa0;
+  --color-warn: #e0b35c;
+  --color-danger: #f07167;
+  --color-surface: #0f1724;
+  --color-ink: #e8eef6;
+  --color-muted: #9aa8bc;
+  --color-panel: #162033;
+  --color-border: #2a3a52;
 }
 
 @layer base {
@@ -39,4 +59,32 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/* Avoid accidental page-wide horizontal scroll at ~400px */
+@media (max-width: 400px) {
+  body {
+    overflow-x: hidden;
+  }
+}
+
+/* Map common light-only utility classes when dark theme is active */
+html[data-theme="dark"] .bg-white {
+  background-color: var(--color-panel);
+}
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-sky-50 {
+  background-color: #1a273a;
+}
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-300 {
+  border-color: var(--color-border);
+}
+html[data-theme="dark"] .text-slate-600,
+html[data-theme="dark"] .text-slate-700 {
+  color: var(--color-muted);
+}
+html[data-theme="dark"] .hover\:bg-slate-50:hover {
+  background-color: #1a273a;
 }

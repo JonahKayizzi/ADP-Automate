@@ -30,9 +30,18 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const queryKey = ['attachments', ownerType, ownerId] as const
 
+  const historyKey = ['attachments-history', ownerType, ownerId] as const
+  const [showHistory, setShowHistory] = useState(false)
+
   const list = useQuery({
     queryKey,
     queryFn: () => attachmentsApi.listAttachments(ownerType, ownerId),
+  })
+
+  const history = useQuery({
+    queryKey: historyKey,
+    queryFn: () => attachmentsApi.listAttachmentHistory(ownerType, ownerId),
+    enabled: showHistory,
   })
 
   const upload = useMutation({
@@ -41,6 +50,7 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
     onSuccess: async () => {
       setError('')
       await qc.invalidateQueries({ queryKey })
+      await qc.invalidateQueries({ queryKey: historyKey })
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : 'Could not upload the file.'),
   })
@@ -50,11 +60,39 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
     onSuccess: async () => {
       setConfirmDeleteId(null)
       await qc.invalidateQueries({ queryKey })
+      await qc.invalidateQueries({ queryKey: historyKey })
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : 'Could not remove the file.'),
   })
 
   const rows = list.data ?? []
+  const historyHint = (
+    <div className="mt-2">
+      <button
+        type="button"
+        className="text-[11px] font-semibold text-brand"
+        onClick={() => setShowHistory((v) => !v)}
+      >
+        {showHistory ? 'Hide previous versions' : 'Show previous versions'}
+      </button>
+      {showHistory ? (
+        history.isLoading ? (
+          <p className="mt-1 text-xs text-muted">Loading history…</p>
+        ) : (history.data ?? []).length === 0 ? (
+          <p className="mt-1 text-xs text-muted">No previous versions.</p>
+        ) : (
+          <FileList
+            rows={history.data ?? []}
+            canEdit={false}
+            confirmDeleteId={null}
+            onConfirmDelete={() => undefined}
+            onRemove={() => undefined}
+            onDownloadError={setError}
+          />
+        )
+      ) : null}
+    </div>
+  )
 
   if (slots && slots.length > 0) {
     const unslotted = rows.filter((r) => !r.slot || !slots.some((s) => s.key === r.slot))
@@ -92,6 +130,7 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
             />
           </div>
         ) : null}
+        {historyHint}
         {error ? <p className="text-xs text-danger">{error}</p> : null}
         <p className="text-[11px] text-muted">PDF, TXT, CSV, JSON, XML, GML, MD, PNG, JPEG · max 20 MB</p>
       </div>
@@ -127,6 +166,7 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
         />
       ) : null}
 
+      {historyHint}
       {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
       <p className="mt-2 text-[11px] text-muted">PDF, TXT, CSV, JSON, XML, GML, MD, PNG, JPEG · max 20 MB</p>
     </div>

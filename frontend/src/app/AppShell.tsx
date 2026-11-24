@@ -4,6 +4,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal'
 import { useSearch } from '@/features/search/SearchContext'
+import { useTheme } from '@/features/theme/ThemeContext'
 import { fetchAiracCurrent } from '@/services/notamApi'
 
 const nav = [
@@ -13,6 +14,7 @@ const nav = [
   { to: '/library', label: 'AIS Library' },
   { to: '/complaints', label: 'Complaints' },
   { to: '/tasks', label: 'Tasks' },
+  { to: '/audit', label: 'Audit' },
 ]
 
 function roleLabel(role: string) {
@@ -31,6 +33,7 @@ function roleLabel(role: string) {
 export function AppShell() {
   const { user, lock, signOut } = useAuth()
   const { query, setQuery } = useSearch()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const airac = useQuery({ queryKey: ['airac-current'], queryFn: fetchAiracCurrent })
@@ -54,8 +57,8 @@ export function AppShell() {
     : nav
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[240px_1fr]">
-      <aside className="flex flex-col border-b border-slate-200 bg-white lg:border-b-0 lg:border-r">
+    <div className="min-h-screen min-w-0 nav:grid nav:grid-cols-[240px_1fr]">
+      <aside className="flex flex-col border-b border-[var(--color-border)] bg-[var(--color-panel)] nav:border-b-0 nav:border-r">
         <div className="flex items-center gap-3 px-4 py-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand text-white" aria-hidden>
             ✈
@@ -68,7 +71,10 @@ export function AppShell() {
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-3 lg:flex-col lg:overflow-visible" aria-label="Main">
+        <nav
+          className="flex gap-1 overflow-x-auto px-2 pb-3 nav:flex-col nav:overflow-visible"
+          aria-label="Main"
+        >
           {links.map((item) => (
             <NavLink
               key={item.to}
@@ -85,7 +91,7 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className="mt-auto border-t border-slate-100 px-4 py-4">
+        <div className="mt-auto hidden border-t border-[var(--color-border)] px-4 py-4 nav:block">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
               {initials}
@@ -99,7 +105,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">
+        <header className="flex flex-wrap items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-3">
           <label className="sr-only" htmlFor="global-search">Search</label>
           <input
             id="global-search"
@@ -113,7 +119,7 @@ export function AppShell() {
               }
             }}
             placeholder="Search NOTAMs, publications, library, complaints, tasks…"
-            className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            className="min-w-0 flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2 text-sm text-ink"
           />
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <div className="font-mono text-xs text-muted">
@@ -133,6 +139,14 @@ export function AppShell() {
                 {user?.designation ? ` · ${user.designation}` : ''}
               </span>
             </div>
+            <button
+              type="button"
+              className="font-medium text-brand"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            >
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
             <button type="button" className="font-medium text-brand" onClick={() => setChangePasswordOpen(true)}>
               Change password
             </button>
@@ -145,7 +159,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">
+        <main className="min-w-0 flex-1 p-4 compact:p-4 nav:p-6">
           <Outlet />
         </main>
       </div>

@@ -18,6 +18,11 @@ public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
       String slot
   );
 
+  List<Attachment> findByOwnerTypeAndOwnerIdAndRetiredTrueOrderByUpdatedAtDesc(
+      AttachmentOwnerType ownerType,
+      UUID ownerId
+  );
+
   Optional<Attachment> findByIdAndRetiredFalse(UUID id);
 
   long countByOwnerTypeAndOwnerIdAndRetiredFalse(AttachmentOwnerType ownerType, UUID ownerId);

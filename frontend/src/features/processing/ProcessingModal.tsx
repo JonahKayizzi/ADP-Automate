@@ -89,9 +89,15 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
     onSuccess: async () => {
       setConfirmRevise(false)
       await invalidate()
+      await qc.invalidateQueries({ queryKey: ['processing-revisions', file.id, formSummary.id] })
       setError('')
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : 'Could not revise.'),
+  })
+
+  const revisions = useQuery({
+    queryKey: ['processing-revisions', file.id, formSummary.id],
+    queryFn: () => processingApi.listFormRevisions(file.id, formSummary.id),
   })
 
   const locked = detail.data?.locked ?? false
@@ -238,6 +244,32 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
               </div>
             ))}
           </div>
+
+          {(revisions.data?.length ?? 0) > 0 ? (
+            <div className="mt-6 space-y-2 border-t pt-4">
+              <h3 className="font-display text-base font-semibold">Previous revisions</h3>
+              <ul className="space-y-2">
+                {revisions.data!.map((rev) => (
+                  <li key={rev.id} className="rounded-md border bg-slate-50 px-3 py-2 text-sm">
+                    <p className="font-semibold">
+                      Revision {rev.revisionNumber}
+                      <span className="ml-2 text-xs font-normal text-muted">
+                        by {rev.revisedByAccount} ·{' '}
+                        {new Intl.DateTimeFormat('en-GB', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        }).format(new Date(rev.revisedAt))}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      {(rev.signatures ?? []).filter((s) => s.signed).length} signature(s) archived
+                      with the signed payload
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3">

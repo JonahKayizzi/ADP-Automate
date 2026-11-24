@@ -51,6 +51,8 @@ app:
   cors-origins: ${CORS_ORIGINS:http://localhost:5173}
   upload-dir: ${UPLOAD_DIR:./data/uploads}
   timezone: Africa/Kampala
+  complaint-open-days: ${COMPLAINT_OPEN_DAYS:14}
+  airac-draft-warning-days: ${AIRAC_DRAFT_WARNING_DAYS:14}
 
 springdoc:
   api-docs:

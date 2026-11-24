@@ -1,5 +1,6 @@
 package ug.caa.adpautomate.dashboard;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ug.caa.adpautomate.airac.AiracCalendar;
@@ -41,6 +42,8 @@ public class DashboardService {
   private final TaskRepository tasks;
   private final ProcessingFileRepository processingFiles;
   private final ProcessingFormRepository processingForms;
+  private final int complaintOpenDays;
+  private final int airacDraftWarningDays;
 
   public DashboardService(
       NotamRepository notams,
@@ -48,7 +51,9 @@ public class DashboardService {
       ComplaintRepository complaints,
       TaskRepository tasks,
       ProcessingFileRepository processingFiles,
-      ProcessingFormRepository processingForms
+      ProcessingFormRepository processingForms,
+      @Value("${app.complaint-open-days:14}") int complaintOpenDays,
+      @Value("${app.airac-draft-warning-days:14}") int airacDraftWarningDays
   ) {
     this.notams = notams;
     this.publications = publications;
@@ -56,6 +61,8 @@ public class DashboardService {
     this.tasks = tasks;
     this.processingFiles = processingFiles;
     this.processingForms = processingForms;
+    this.complaintOpenDays = complaintOpenDays;
+    this.airacDraftWarningDays = airacDraftWarningDays;
   }
 
   @Transactional(readOnly = true)
@@ -98,7 +105,7 @@ public class DashboardService {
       }
       LocalDate deadline = AiracCalendar.distributeBy(publication.getEffective());
       long days = ChronoUnit.DAYS.between(today, deadline);
-      if (days <= 14) {
+      if (days <= airacDraftWarningDays) {
         String severity = days < 0 ? "critical" : "warning";
         String detail = days < 0
             ? "AIRAC draft past distribution deadline"
@@ -143,7 +150,7 @@ public class DashboardService {
 
     for (Complaint complaint : complaints.findByRetiredFalseAndStatusOrderByReceivedDescCreatedAtDesc(ComplaintStatus.OPEN)) {
       long openDays = ChronoUnit.DAYS.between(complaint.getReceived(), today);
-      if (openDays > 14) {
+      if (openDays > complaintOpenDays) {
         rows.add(item(
             "warning",
             "complaint",
