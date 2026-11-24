@@ -219,7 +219,7 @@ export function OverviewPage() {
           </p>
         </div>
         {summary.isLoading ? <p className="text-sm text-muted">Loading AIRAC…</p> : null}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 nav:grid-cols-4">
           {airac.map((cycle) => (
             <AiracCard key={cycle.ident} cycle={cycle} />
           ))}

@@ -92,8 +92,8 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
         </Field>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <h3 className="font-display text-base font-semibold sm:col-span-2">Approval</h3>
+      <section className="grid gap-3 compact:grid-cols-1 nav:grid-cols-2">
+        <h3 className="font-display text-base font-semibold nav:col-span-2">Approval</h3>
         <Field label="Approver">
           <TextInput value={asString(payload.approver)} disabled={locked} onChange={(v) => set(payload, 'approver', v, onChange)} />
         </Field>

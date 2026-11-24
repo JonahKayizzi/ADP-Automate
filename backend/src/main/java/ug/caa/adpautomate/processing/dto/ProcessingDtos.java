@@ -62,4 +62,15 @@ public final class ProcessingDtos {
 
   public record SignRequest(String signerName, String designation) {
   }
+
+  public record FormRevisionResponse(
+      UUID id,
+      int revisionNumber,
+      String formCode,
+      Map<String, Object> payload,
+      List<Map<String, Object>> signatures,
+      Instant revisedAt,
+      String revisedByAccount
+  ) {
+  }
 }

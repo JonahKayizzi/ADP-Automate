@@ -10,7 +10,9 @@ import { PublicationsPage } from '@/features/publications/PublicationsPage'
 import { LibraryPage } from '@/features/library/LibraryPage'
 import { ComplaintsPage } from '@/features/complaints/ComplaintsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
+import { AuditPage } from '@/features/audit/AuditPage'
 import { SearchProvider } from '@/features/search/SearchContext'
+import { ThemeProvider } from '@/features/theme/ThemeContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,26 +26,29 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <AuthGate>
-            <SearchProvider>
-              <Routes>
-                <Route element={<AppShell />}>
-                  <Route index element={<Navigate to="/overview" replace />} />
-                  <Route path="overview" element={<OverviewPage />} />
-                  <Route path="notams" element={<NotamsPage />} />
-                  <Route path="publications" element={<PublicationsPage />} />
-                  <Route path="library" element={<LibraryPage />} />
-                  <Route path="complaints" element={<ComplaintsPage />} />
-                  <Route path="tasks" element={<TasksPage />} />
-                  <Route path="users" element={<UsersPage />} />
-                </Route>
-              </Routes>
-            </SearchProvider>
-          </AuthGate>
-        </BrowserRouter>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AuthGate>
+              <SearchProvider>
+                <Routes>
+                  <Route element={<AppShell />}>
+                    <Route index element={<Navigate to="/overview" replace />} />
+                    <Route path="overview" element={<OverviewPage />} />
+                    <Route path="notams" element={<NotamsPage />} />
+                    <Route path="publications" element={<PublicationsPage />} />
+                    <Route path="library" element={<LibraryPage />} />
+                    <Route path="complaints" element={<ComplaintsPage />} />
+                    <Route path="tasks" element={<TasksPage />} />
+                    <Route path="audit" element={<AuditPage />} />
+                    <Route path="users" element={<UsersPage />} />
+                  </Route>
+                </Routes>
+              </SearchProvider>
+            </AuthGate>
+          </BrowserRouter>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

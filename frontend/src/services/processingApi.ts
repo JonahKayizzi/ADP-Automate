@@ -35,3 +35,17 @@ export function reviseForm(fileId: string, formId: string) {
     body: JSON.stringify({}),
   })
 }
+
+export type FormRevision = {
+  id: string
+  revisionNumber: number
+  formCode: string
+  payload: Record<string, unknown>
+  signatures: Record<string, unknown>[]
+  revisedAt: string
+  revisedByAccount: string
+}
+
+export function listFormRevisions(fileId: string, formId: string) {
+  return api<FormRevision[]>(`/processing-files/${fileId}/forms/${formId}/revisions`)
+}

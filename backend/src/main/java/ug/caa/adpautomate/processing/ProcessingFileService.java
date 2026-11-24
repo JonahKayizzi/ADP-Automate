@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ug.caa.adpautomate.account.AccountRole;
+import ug.caa.adpautomate.audit.AuditService;
 import ug.caa.adpautomate.auth.AccountPrincipal;
 import ug.caa.adpautomate.auth.AuthService;
 import ug.caa.adpautomate.notam.Notam;
@@ -12,6 +13,7 @@ import ug.caa.adpautomate.notam.NotamRepository;
 import ug.caa.adpautomate.processing.ProcessingFormCatalog.FormDef;
 import ug.caa.adpautomate.processing.ProcessingFormCatalog.SlotDef;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.FormDetail;
+import ug.caa.adpautomate.processing.dto.ProcessingDtos.FormRevisionResponse;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.FormSummary;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.ProcessingFileResponse;
 import ug.caa.adpautomate.processing.dto.ProcessingDtos.SaveFormRequest;
@@ -36,23 +38,29 @@ public class ProcessingFileService {
   private final ProcessingFileRepository files;
   private final ProcessingFormRepository forms;
   private final ProcessingSignatureRepository signatures;
+  private final ProcessingFormRevisionRepository revisions;
   private final NotamRepository notams;
   private final PublicationRepository publications;
+  private final AuditService auditService;
   private final ObjectMapper objectMapper;
 
   public ProcessingFileService(
       ProcessingFileRepository files,
       ProcessingFormRepository forms,
       ProcessingSignatureRepository signatures,
+      ProcessingFormRevisionRepository revisions,
       NotamRepository notams,
       PublicationRepository publications,
+      AuditService auditService,
       ObjectMapper objectMapper
   ) {
     this.files = files;
     this.forms = forms;
     this.signatures = signatures;
+    this.revisions = revisions;
     this.notams = notams;
     this.publications = publications;
+    this.auditService = auditService;
     this.objectMapper = objectMapper;
   }
 
@@ -94,14 +102,17 @@ public class ProcessingFileService {
     forms.save(form);
     file.setUpdatedAt(Instant.now());
     files.save(file);
-
-    FormDetail detail = toFormDetail(form);
-    if (hadSignatures) {
-      // Client shows a toast from signaturesCleared query flag via response header alternative —
-      // include as payload property is awkward; return via ProblemDetail not needed. Frontend
-      // compares previous signedCount.
-    }
-    return detail;
+    auditService.record(
+        "processing.form.save",
+        "processing_form",
+        form.getId().toString(),
+        Map.of(
+            "formCode", form.getFormCode(),
+            "signaturesCleared", hadSignatures,
+            "fileId", file.getId().toString()
+        )
+    );
+    return toFormDetail(form);
   }
 
   @Transactional
@@ -158,6 +169,16 @@ public class ProcessingFileService {
     forms.save(form);
     file.setUpdatedAt(now);
     files.save(file);
+    auditService.record(
+        "processing.form.sign",
+        "processing_form",
+        form.getId().toString(),
+        Map.of(
+            "formCode", form.getFormCode(),
+            "slotKey", slotKey,
+            "status", form.getStatus().getLabel()
+        )
+    );
     return toFormDetail(form);
   }
 
@@ -166,6 +187,7 @@ public class ProcessingFileService {
     AccountPrincipal actor = requireEditor();
     ProcessingFile file = requireFile(fileId);
     ProcessingForm form = requireForm(file.getId(), formId);
+    archiveRevision(form, actor.getUsername());
     clearSignatures(form.getId());
     form.setStatus(ProcessingFormStatus.IN_PROGRESS);
     form.setUpdatedAt(Instant.now());
@@ -173,7 +195,63 @@ public class ProcessingFileService {
     forms.save(form);
     file.setUpdatedAt(Instant.now());
     files.save(file);
+    auditService.record(
+        "processing.form.revise",
+        "processing_form",
+        form.getId().toString(),
+        Map.of("formCode", form.getFormCode(), "fileId", file.getId().toString())
+    );
     return toFormDetail(form);
+  }
+
+  @Transactional(readOnly = true)
+  public List<FormRevisionResponse> listRevisions(UUID fileId, UUID formId) {
+    requireFile(fileId);
+    ProcessingForm form = requireForm(fileId, formId);
+    return revisions.findByFormIdOrderByRevisionNumberDesc(form.getId()).stream()
+        .map(r -> new FormRevisionResponse(
+            r.getId(),
+            r.getRevisionNumber(),
+            r.getFormCode(),
+            r.getPayload(),
+            r.getSignatures(),
+            r.getRevisedAt(),
+            r.getRevisedByAccount()
+        ))
+        .toList();
+  }
+
+  private void archiveRevision(ProcessingForm form, String actorUsername) {
+    List<ProcessingSignature> slots = signatures.findByFormIdOrderBySlotKeyAsc(form.getId());
+    boolean anySigned = slots.stream().anyMatch(ProcessingSignature::isSigned);
+    if (!anySigned && form.getStatus() != ProcessingFormStatus.SIGNED_OFF) {
+      return;
+    }
+    int next = revisions.findFirstByFormIdOrderByRevisionNumberDesc(form.getId())
+        .map(r -> r.getRevisionNumber() + 1)
+        .orElse(1);
+    List<Map<String, Object>> sigSnapshot = new ArrayList<>();
+    for (ProcessingSignature slot : slots) {
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("slotKey", slot.getSlotKey());
+      row.put("slotLabel", slot.getSlotLabel());
+      row.put("signerName", slot.getSignerName());
+      row.put("designation", slot.getDesignation());
+      row.put("signedAt", slot.getSignedAt() == null ? null : slot.getSignedAt().toString());
+      row.put("signedByAccount", slot.getSignedByAccount());
+      row.put("signed", slot.isSigned());
+      sigSnapshot.add(row);
+    }
+    ProcessingFormRevision revision = new ProcessingFormRevision();
+    revision.setId(UUID.randomUUID());
+    revision.setFormId(form.getId());
+    revision.setRevisionNumber(next);
+    revision.setFormCode(form.getFormCode());
+    revision.setPayload(deepCopy(form.getPayload()));
+    revision.setSignatures(sigSnapshot);
+    revision.setRevisedAt(Instant.now());
+    revision.setRevisedByAccount(actorUsername);
+    revisions.save(revision);
   }
 
   @Transactional(readOnly = true)

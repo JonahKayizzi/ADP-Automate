@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import ug.caa.adpautomate.account.AccountRole;
 import ug.caa.adpautomate.attachment.dto.AttachmentDtos.AttachmentResponse;
+import ug.caa.adpautomate.audit.AuditService;
 import ug.caa.adpautomate.auth.AccountPrincipal;
 import ug.caa.adpautomate.auth.AuthService;
 import ug.caa.adpautomate.library.LibraryDocumentRepository;
@@ -52,19 +53,22 @@ public class AttachmentService {
   private final NotamRepository notams;
   private final PublicationRepository publications;
   private final LibraryDocumentRepository libraryDocuments;
+  private final AuditService auditService;
 
   public AttachmentService(
       AttachmentRepository attachments,
       LocalFileStorage storage,
       NotamRepository notams,
       PublicationRepository publications,
-      LibraryDocumentRepository libraryDocuments
+      LibraryDocumentRepository libraryDocuments,
+      AuditService auditService
   ) {
     this.attachments = attachments;
     this.storage = storage;
     this.notams = notams;
     this.publications = publications;
     this.libraryDocuments = libraryDocuments;
+    this.auditService = auditService;
   }
 
   @Transactional(readOnly = true)
@@ -137,7 +141,28 @@ public class AttachmentService {
     attachment.setUpdatedAt(now);
     attachment.setUpdatedByAccount(actor.getUsername());
     attachments.save(attachment);
+    auditService.record(
+        "attachment.upload",
+        "attachment",
+        attachment.getId().toString(),
+        Map.of(
+            "ownerType", ownerType.getLabel(),
+            "ownerId", ownerId.toString(),
+            "slot", slot == null ? "" : slot,
+            "filename", original
+        )
+    );
     return toResponse(attachment);
+  }
+
+  @Transactional(readOnly = true)
+  public List<AttachmentResponse> listHistory(String ownerTypeLabel, UUID ownerId) {
+    AttachmentOwnerType ownerType = parseOwnerType(ownerTypeLabel);
+    requireOwnerExists(ownerType, ownerId);
+    return attachments.findByOwnerTypeAndOwnerIdAndRetiredTrueOrderByUpdatedAtDesc(ownerType, ownerId)
+        .stream()
+        .map(this::toResponse)
+        .toList();
   }
 
   private void retireSlot(
@@ -214,6 +239,24 @@ public class AttachmentService {
     attachment.setUpdatedAt(Instant.now());
     attachment.setUpdatedByAccount(actor.getUsername());
     attachments.save(attachment);
+    auditService.record(
+        "attachment.remove",
+        "attachment",
+        attachment.getId().toString(),
+        Map.of(
+            "ownerType", attachment.getOwnerType().getLabel(),
+            "ownerId", attachment.getOwnerId().toString(),
+            "filename", attachment.getOriginalFilename()
+        )
+    );
+  }
+
+  @Transactional(readOnly = true)
+  public LoadedAttachment downloadAny(UUID id) {
+    Attachment attachment = attachments.findById(id)
+        .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Attachment not found."));
+    Resource resource = storage.load(attachment.getStorageKey());
+    return new LoadedAttachment(attachment, resource);
   }
 
   private void requireOwnerExists(AttachmentOwnerType ownerType, UUID ownerId) {
