@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   push:
-    branches: [main]
+    branches: [main, dev]
 
 permissions:
   contents: read
@@ -38,6 +38,7 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+      - run: mvn --batch-mode -Dtest='!AdpAutomateApplicationTests' test
       - run: mvn --batch-mode -DskipTests package
-      # Integration tests (Testcontainers) once Docker is reliable in CI:
+      # Full Spring context + Testcontainers when Docker is available in CI:
       # - run: mvn --batch-mode verify

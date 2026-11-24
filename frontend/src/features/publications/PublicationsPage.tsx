@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AttachmentsPanel } from '@/features/attachments/AttachmentsPanel'
 import { ProcessingFilePanel } from '@/features/processing/ProcessingFilePanel'
 import { useAuth } from '@/features/auth/AuthContext'
+import { focusClass, useFocusRecord } from '@/hooks/useFocusRecord'
 import { ApiError } from '@/services/api'
 import * as publicationApi from '@/services/publicationApi'
 import type { AiracOption, Publication, PublicationFilter, UpsertPublication } from '@/types/publication'
@@ -59,6 +60,7 @@ function defaultForm(airacOptions: AiracOption[]): UpsertPublication {
 export function PublicationsPage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'VIEWER'
+  const focusId = useFocusRecord()
   const qc = useQueryClient()
   const [filter, setFilter] = useState<PublicationFilter>('ALL')
   const [open, setOpen] = useState(false)
@@ -197,7 +199,11 @@ export function PublicationsPage() {
 
       <div className="space-y-3">
         {rows.map((pub) => (
-          <article key={pub.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <article
+            id={`record-${pub.id}`}
+            key={pub.id}
+            className={`rounded-xl border border-slate-200 bg-white p-4 ${focusClass(focusId, pub.id)}`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

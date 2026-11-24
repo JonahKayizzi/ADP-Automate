@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '@/features/auth/AuthContext'
+import { focusClass, useFocusRecord } from '@/hooks/useFocusRecord'
 import { ApiError } from '@/services/api'
 import * as tasksApi from '@/services/tasksApi'
 import type { TaskItem, UpsertTask } from '@/types/task'
@@ -51,6 +52,7 @@ function buildEmail(task: TaskItem, assignerName: string, assignerDesignation?: 
 export function TasksPage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'VIEWER'
+  const focusId = useFocusRecord()
   const qc = useQueryClient()
   const [filter, setFilter] = useState('Open')
   const [open, setOpen] = useState(false)
@@ -201,7 +203,11 @@ export function TasksPage() {
 
       <div className="space-y-3">
         {rows.map((task) => (
-          <article key={task.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <article
+            id={`record-${task.id}`}
+            key={task.id}
+            className={`rounded-xl border border-slate-200 bg-white p-4 ${focusClass(focusId, task.id)}`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

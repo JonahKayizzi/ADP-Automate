@@ -1,5 +1,7 @@
 package ug.caa.adpautomate.attachment;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -16,14 +18,33 @@ import java.nio.file.StandardCopyOption;
 @Component
 public class LocalFileStorage {
 
+  private static final Logger log = LoggerFactory.getLogger(LocalFileStorage.class);
+
   private final Path root;
 
   public LocalFileStorage(@Value("${app.upload-dir}") String uploadDir) {
-    this.root = Path.of(uploadDir).toAbsolutePath().normalize();
+    Path configured = Path.of(uploadDir).toAbsolutePath().normalize();
+    this.root = ensureWritable(configured);
+  }
+
+  private static Path ensureWritable(Path preferred) {
     try {
-      Files.createDirectories(this.root);
+      Files.createDirectories(preferred);
+      if (Files.isWritable(preferred)) {
+        return preferred;
+      }
     } catch (IOException ex) {
-      throw new IllegalStateException("Cannot create upload directory: " + this.root, ex);
+      log.warn("Upload dir {} is not usable ({}), falling back to temp.", preferred, ex.toString());
+    }
+    Path fallback = Path.of(System.getProperty("java.io.tmpdir"), "adp-automate-uploads")
+        .toAbsolutePath()
+        .normalize();
+    try {
+      Files.createDirectories(fallback);
+      log.warn("Using fallback upload directory: {}", fallback);
+      return fallback;
+    } catch (IOException ex) {
+      throw new IllegalStateException("Cannot create upload directory: " + preferred + " or " + fallback, ex);
     }
   }
 

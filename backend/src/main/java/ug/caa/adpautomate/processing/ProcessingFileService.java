@@ -85,7 +85,7 @@ public class ProcessingFileService {
     }
 
     boolean hadSignatures = clearSignaturesIfPresent(form.getId());
-    form.setPayload(new LinkedHashMap<>(request.payload()));
+    form.setPayload(ProcessingFormCatalog.normalizePayload(form.getFormCode(), request.payload()));
     form.setStatus(ProcessingFormStatus.IN_PROGRESS);
     form.setUpdatedAt(Instant.now());
     form.setUpdatedByAccount(actor.getUsername());
@@ -320,6 +320,7 @@ public class ProcessingFileService {
             s.isSigned()
         ))
         .toList();
+    Map<String, Object> payload = ProcessingFormCatalog.normalizePayload(form.getFormCode(), form.getPayload());
     return new FormDetail(
         form.getId(),
         form.getStepNumber(),
@@ -328,7 +329,7 @@ public class ProcessingFileService {
         form.getControlledNotice(),
         form.getStatus().getLabel(),
         form.getStatus() == ProcessingFormStatus.SIGNED_OFF,
-        form.getPayload(),
+        payload,
         slots,
         form.getUpdatedAt()
     );

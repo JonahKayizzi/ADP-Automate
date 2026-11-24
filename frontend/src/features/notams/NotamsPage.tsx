@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { AttachmentsPanel } from '@/features/attachments/AttachmentsPanel'
 import { ProcessingFilePanel } from '@/features/processing/ProcessingFilePanel'
 import { useAuth } from '@/features/auth/AuthContext'
+import { focusClass, useFocusRecord } from '@/hooks/useFocusRecord'
 import { ApiError } from '@/services/api'
 import * as notamApi from '@/services/notamApi'
 import * as processingApi from '@/services/processingApi'
@@ -51,6 +52,7 @@ const emptyForm = (): UpsertNotam => ({
 export function NotamsPage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'VIEWER'
+  const focusId = useFocusRecord()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Notam | null>(null)
@@ -153,7 +155,11 @@ export function NotamsPage() {
 
       <div className="space-y-3">
         {rows.map((notam) => (
-          <article key={notam.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <article
+            id={`record-${notam.id}`}
+            key={notam.id}
+            className={`rounded-xl border border-slate-200 bg-white p-4 ${focusClass(focusId, notam.id)}`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

@@ -14,6 +14,15 @@ type Props = {
   onClose: () => void
 }
 
+function shortStepLabel(formCode: string, formTitle: string) {
+  if (formCode.endsWith('/OF/82')) return 'Raw data QC'
+  if (formCode.endsWith('/OF/83a')) return 'AIP metadata'
+  if (formCode.endsWith('/OF/83b')) return 'Metadata'
+  if (formCode.endsWith('/OF/83c')) return 'Raw data processing'
+  if (formCode.endsWith('/OF/83d')) return 'Product QC'
+  return formTitle.split('(')[0].trim()
+}
+
 export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) {
   const { user } = useAuth()
   const qc = useQueryClient()
@@ -91,35 +100,75 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-6">
       <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-white shadow-xl">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Processing file · {file.recordKind}
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-5">
+          <div className="min-w-0 pr-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+              Processing file · Step {step} of {file.forms.length}
             </p>
-            <h2 className="font-display text-xl font-semibold text-ink">
-              Step {step}: {formSummary.formTitle}
+            <h2 className="mt-1.5 font-display text-xl font-semibold leading-snug text-ink">
+              {formSummary.formTitle}
+              <span className="ml-2 font-sans text-sm font-normal text-muted">· {file.recordKind}</span>
             </h2>
-            <p className="mt-1 font-mono text-xs text-muted">{formSummary.formCode}</p>
+            <p className="mt-1.5 font-mono text-xs text-muted">{formSummary.formCode}</p>
           </div>
-          <button type="button" className="text-sm text-muted" onClick={onClose}>
+          <button type="button" className="shrink-0 pt-0.5 text-sm text-muted hover:text-ink" onClick={onClose}>
             Close
           </button>
         </div>
 
-        <div className="flex gap-1 overflow-x-auto border-b px-3 py-2">
-          {file.forms.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                f.stepNumber === step ? 'bg-brand text-white' : 'bg-slate-100 text-ink'
-              }`}
-              onClick={() => setStep(f.stepNumber)}
-            >
-              {f.stepNumber}. {f.formTitle.split('(')[0].trim()}
-            </button>
-          ))}
-        </div>
+        <nav className="border-b border-slate-200 px-5" aria-label="Processing form steps">
+          <ol className="-mb-px flex gap-1 overflow-x-auto pb-0">
+            {file.forms.map((f) => {
+              const active = f.stepNumber === step
+              const signed = f.status === 'Signed off'
+              const inProgress = f.status === 'In progress'
+              return (
+                <li key={f.id} className="min-w-[10.5rem] flex-1">
+                  <button
+                    type="button"
+                    aria-current={active ? 'step' : undefined}
+                    className={`flex h-full w-full items-start gap-2.5 border-b-2 px-2 py-3.5 text-left transition-colors ${
+                      active
+                        ? 'border-brand bg-sky-50/60'
+                        : 'border-transparent hover:bg-slate-50'
+                    }`}
+                    onClick={() => setStep(f.stepNumber)}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        signed
+                          ? 'bg-emerald-600 text-white'
+                          : active
+                            ? 'bg-brand text-white'
+                            : inProgress
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {signed ? '✓' : f.stepNumber}
+                    </span>
+                    <span className="min-w-0 pt-0.5">
+                      <span
+                        className={`block whitespace-normal text-sm font-semibold leading-5 ${
+                          active ? 'text-brand' : 'text-ink'
+                        }`}
+                      >
+                        {shortStepLabel(f.formCode, f.formTitle)}
+                      </span>
+                      <span
+                        className={`mt-1 block text-[11px] font-medium leading-4 ${
+                          signed ? 'text-ok' : inProgress ? 'text-warn' : 'text-muted'
+                        }`}
+                      >
+                        {f.status}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        </nav>
 
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {toast ? (

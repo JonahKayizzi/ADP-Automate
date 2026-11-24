@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthContext'
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal'
+import { useSearch } from '@/features/search/SearchContext'
 import { fetchAiracCurrent } from '@/services/notamApi'
 
 const nav = [
@@ -29,6 +30,8 @@ function roleLabel(role: string) {
 
 export function AppShell() {
   const { user, lock, signOut } = useAuth()
+  const { query, setQuery } = useSearch()
+  const navigate = useNavigate()
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const airac = useQuery({ queryKey: ['airac-current'], queryFn: fetchAiracCurrent })
   const initials = (user?.displayName ?? '?')
@@ -101,7 +104,15 @@ export function AppShell() {
           <input
             id="global-search"
             type="search"
-            placeholder="Search NOTAM numbers, titles, originators..."
+            value={query}
+            onChange={(e) => {
+              const value = e.target.value
+              setQuery(value)
+              if (value.trim()) {
+                navigate('/overview')
+              }
+            }}
+            placeholder="Search NOTAMs, publications, library, complaints, tasks…"
             className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap items-center gap-3 text-sm">

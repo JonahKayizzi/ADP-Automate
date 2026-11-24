@@ -62,4 +62,15 @@ class AiracCalendarTest {
     assertEquals(LocalDate.of(2026, 10, 29), AiracCalendar.cycleStartContaining(LocalDate.of(2026, 10, 29)));
     assertEquals(1, AiracCalendar.dayWithinCycle(LocalDate.of(2026, 10, 29), LocalDate.of(2026, 10, 29)));
   }
+
+  @Test
+  void attentionWindowFlagsDraftsWithin14DaysOfDeadline() {
+    LocalDate effective = LocalDate.of(2026, 11, 26);
+    LocalDate deadline = AiracCalendar.distributeBy(effective);
+    LocalDate fourteenDaysBefore = deadline.minusDays(14);
+    long daysToDeadline = java.time.temporal.ChronoUnit.DAYS.between(fourteenDaysBefore, deadline);
+    assertEquals(14, daysToDeadline);
+    assertTrue(daysToDeadline <= 14);
+    assertTrue(java.time.temporal.ChronoUnit.DAYS.between(deadline.plusDays(1), deadline) < 0);
+  }
 }

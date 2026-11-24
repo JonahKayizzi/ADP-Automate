@@ -86,11 +86,14 @@ Copy `.env.example` to `.env`. On Render, set:
 
 ## Implementation phases
 
-1. **Foundation** (current) — repo, Spring Boot, React, Postgres, Docker, CI stub  
-2. Core registers — NOTAMs, publications, AIRAC, library, files  
-3. Processing files — OF/82–83d, signatures, revisions  
-4. Operational modules — complaints, tasks, users, search, dashboard  
-5. Stabilization — E2E, security, Render/UAT, release  
+1. **Foundation** — repo, Spring Boot, React, Postgres, Docker, CI  
+2. **Core registers** — NOTAMs, publications, AIRAC, library, attachments  
+3. **Processing files** — OF/82–83d, signatures, revisions  
+4. **Operational modules** — complaints, tasks, users, global search, dashboard  
+5. **Stabilization** (current) — search deep-links, needs-attention, Render UAT, hardening  
+
+Staging: API `https://adp-automate.onrender.com` · UI `https://adp-automate-1.onrender.com` (deploy from `dev`).  
+
 
 ## License
 

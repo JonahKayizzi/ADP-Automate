@@ -21,8 +21,16 @@ type Props = {
 
 type CompletenessRow = { item: string; column?: string; value: string }
 type AixmRow = { item: string; value: string }
-type MetaRow = { label: string; value: string }
 type SystemGroup = { name: string; steps: { label: string; done: string }[] }
+type MetaField =
+  | { kind: 'section'; title: string }
+  | {
+      kind: 'field'
+      key: string
+      item: string
+      description?: string
+      input?: 'text' | 'textarea' | 'date' | 'adq' | 'operation'
+    }
 type Part1Row = {
   label: string
   description: string
@@ -171,66 +179,182 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
   )
 }
 
+const of83bFields: MetaField[] = [
+  { kind: 'field', key: 'personResponsible', item: 'Person responsible', input: 'text' },
+  { kind: 'field', key: 'role', item: 'Role', input: 'text' },
+  { kind: 'field', key: 'datePerformed', item: 'Date performed', input: 'date' },
+  {
+    kind: 'field',
+    key: 'standardsApplied',
+    item: 'Standards applied',
+    description: 'e.g. ICAO Annex 15; Civil Aviation (ATS and AIS) Regulations',
+    input: 'textarea',
+  },
+  {
+    kind: 'field',
+    key: 'effectiveDateTime',
+    item: 'Effective date/time',
+    description: 'As written, e.g. 2611260000',
+    input: 'text',
+  },
+  {
+    kind: 'field',
+    key: 'endDateTime',
+    item: 'End date/time',
+    description: 'As written, e.g. 2612050000 or PERM',
+    input: 'text',
+  },
+  { kind: 'field', key: 'schedule', item: 'Schedule', input: 'text' },
+  { kind: 'section', title: 'For coordinate, distance, bearing and elevation data' },
+  { kind: 'field', key: 'referenceSystem', item: 'Reference system', input: 'text' },
+  { kind: 'field', key: 'methodUsed', item: 'Method used', input: 'text' },
+  { kind: 'field', key: 'qualityAccuracy', item: 'Quality attributes — accuracy', input: 'text' },
+  { kind: 'field', key: 'qualityResolution', item: 'Quality attributes — resolution', input: 'text' },
+  { kind: 'section', title: 'Converted / transformed data' },
+  { kind: 'field', key: 'conversionUsed', item: 'Conversion used', input: 'text' },
+  { kind: 'section', title: 'Tools used' },
+  { kind: 'field', key: 'tool', item: 'Tool', input: 'text' },
+  { kind: 'field', key: 'toolVersion', item: 'Version', input: 'text' },
+]
+
+const of83aFields: MetaField[] = [
+  {
+    kind: 'field',
+    key: 'adqCompliance',
+    item: 'ADQ compliance',
+    description: 'ADQ-IR regulation compliance',
+    input: 'adq',
+  },
+  { kind: 'field', key: 'reviewDate', item: 'Review date', input: 'date' },
+  { kind: 'field', key: 'personResponsible', item: 'Person responsible', input: 'text' },
+  { kind: 'field', key: 'role', item: 'Role', input: 'text' },
+  {
+    kind: 'field',
+    key: 'operation',
+    item: 'Operation performed',
+    description: 'New data, amended data, or withdrawn data',
+    input: 'operation',
+  },
+  { kind: 'field', key: 'datePerformed', item: 'Date performed', input: 'date' },
+  {
+    kind: 'field',
+    key: 'standardsApplied',
+    item: 'Standards applied',
+    input: 'textarea',
+  },
+  { kind: 'field', key: 'effectiveDate', item: 'Effective date', input: 'date' },
+  {
+    kind: 'field',
+    key: 'effectiveTime',
+    item: 'Effective time',
+    description: 'e.g. 0000 UTC',
+    input: 'text',
+  },
+  { kind: 'section', title: 'For coordinate, distance, bearing and elevation data' },
+  { kind: 'field', key: 'referenceSystem', item: 'Reference system', input: 'textarea' },
+  { kind: 'field', key: 'methodUsed', item: 'Method used', input: 'textarea' },
+  { kind: 'field', key: 'qualityAccuracy', item: 'Quality attributes — accuracy', input: 'textarea' },
+  { kind: 'field', key: 'qualityResolution', item: 'Quality attributes — resolution', input: 'textarea' },
+  { kind: 'section', title: 'Converted / transformed data' },
+  { kind: 'field', key: 'conversionUsed', item: 'Conversion used', input: 'textarea' },
+  { kind: 'section', title: 'Tools used' },
+  { kind: 'field', key: 'tool', item: 'Tool', input: 'textarea' },
+  { kind: 'field', key: 'toolVersion', item: 'Version', input: 'textarea' },
+]
+
 function Of83b({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
-  const rows = asArray<MetaRow>(payload.rows)
+  return <MetaDataTable fields={of83bFields} payload={payload} locked={locked} onChange={onChange} />
+}
+
+function Of83a({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
+  return <MetaDataTable fields={of83aFields} payload={payload} locked={locked} onChange={onChange} />
+}
+
+function MetaDataTable({
+  fields,
+  payload,
+  locked,
+  onChange,
+}: {
+  fields: MetaField[]
+  payload: Record<string, unknown>
+  locked: boolean
+  onChange: Props['onChange']
+}) {
   return (
-    <div className="space-y-3">
-      {rows.map((row, idx) => (
-        <Field key={row.label} label={row.label}>
-          <TextArea
-            rows={2}
-            value={row.value}
-            disabled={locked}
-            onChange={(v) => {
-              const next = rows.map((r, i) => (i === idx ? { ...r, value: v } : r))
-              set(payload, 'rows', next, onChange)
-            }}
-          />
-        </Field>
-      ))}
+    <div className="overflow-x-auto rounded-md border border-slate-200">
+      <table className="w-full min-w-[36rem] border-collapse text-sm">
+        <thead>
+          <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-muted">
+            <th className="border-b px-3 py-2 w-[28%]">Item</th>
+            <th className="border-b px-3 py-2 w-[32%]">Description</th>
+            <th className="border-b px-3 py-2">Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          {fields.map((row) => {
+            if (row.kind === 'section') {
+              return (
+                <tr key={row.title} className="bg-sky-50">
+                  <td colSpan={3} className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand">
+                    {row.title}
+                  </td>
+                </tr>
+              )
+            }
+            return (
+              <tr key={row.key} className="align-top border-b border-slate-100">
+                <td className="px-3 py-2 font-semibold text-ink">{row.item}</td>
+                <td className="px-3 py-2 text-xs text-muted">{row.description ?? ''}</td>
+                <td className="px-3 py-2">
+                  <MetaValueInput
+                    input={row.input ?? 'text'}
+                    value={asString(payload[row.key])}
+                    locked={locked}
+                    onChange={(v) => set(payload, row.key, v, onChange)}
+                  />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function Of83a({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
-  return (
-    <div className="space-y-4">
-      <Field label="ADQ compliance">
-        <PillGroup
-          value={asString(payload.adqCompliance)}
-          options={yesNoOptions}
-          disabled={locked}
-          onChange={(v) => set(payload, 'adqCompliance', v, onChange)}
-        />
-      </Field>
-      <Field label="Review date">
-        <TextInput type="date" value={asString(payload.reviewDate)} disabled={locked} onChange={(v) => set(payload, 'reviewDate', v, onChange)} />
-      </Field>
-      <Field label="Operation performed">
-        <PillGroup
-          value={asString(payload.operation)}
-          options={[
-            { value: 'New', label: 'New', tone: 'ok' },
-            { value: 'Amended', label: 'Amended', tone: 'neutral' },
-            { value: 'Withdrawn data', label: 'Withdrawn data', tone: 'bad' },
-          ]}
-          disabled={locked}
-          onChange={(v) => set(payload, 'operation', v, onChange)}
-        />
-      </Field>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Effective date">
-          <TextInput type="date" value={asString(payload.effectiveDate)} disabled={locked} onChange={(v) => set(payload, 'effectiveDate', v, onChange)} />
-        </Field>
-        <Field label="Effective time">
-          <TextInput value={asString(payload.effectiveTime)} disabled={locked} onChange={(v) => set(payload, 'effectiveTime', v, onChange)} />
-        </Field>
-      </div>
-      <Field label="Notes">
-        <TextArea value={asString(payload.notes)} disabled={locked} onChange={(v) => set(payload, 'notes', v, onChange)} />
-      </Field>
-    </div>
-  )
+function MetaValueInput({
+  input,
+  value,
+  locked,
+  onChange,
+}: {
+  input: NonNullable<Extract<MetaField, { kind: 'field' }>['input']>
+  value: string
+  locked: boolean
+  onChange: (v: string) => void
+}) {
+  if (input === 'adq') {
+    return <PillGroup value={value} options={yesNoOptions} disabled={locked} onChange={onChange} />
+  }
+  if (input === 'operation') {
+    return (
+      <PillGroup
+        value={value}
+        options={[
+          { value: 'New', label: 'New', tone: 'ok' },
+          { value: 'Amended', label: 'Amended', tone: 'neutral' },
+          { value: 'Withdrawn', label: 'Withdrawn', tone: 'bad' },
+        ]}
+        disabled={locked}
+        onChange={onChange}
+      />
+    )
+  }
+  if (input === 'textarea') {
+    return <TextArea rows={2} value={value} disabled={locked} onChange={onChange} />
+  }
+  return <TextInput type={input === 'date' ? 'date' : 'text'} value={value} disabled={locked} onChange={onChange} />
 }
 
 function Of83c({ payload, locked, onChange }: Omit<Props, 'formCode'>) {

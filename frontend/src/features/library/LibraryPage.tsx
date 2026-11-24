@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { AttachmentsPanel } from '@/features/attachments/AttachmentsPanel'
 import { useAuth } from '@/features/auth/AuthContext'
+import { focusClass, useFocusRecord } from '@/hooks/useFocusRecord'
 import { ApiError } from '@/services/api'
 import * as libraryApi from '@/services/libraryApi'
 import type { LibraryDocument, UpsertLibraryDocument } from '@/types/library'
@@ -15,6 +16,7 @@ const emptyForm = (): UpsertLibraryDocument => ({
 export function LibraryPage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'VIEWER'
+  const focusId = useFocusRecord()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<LibraryDocument | null>(null)
@@ -110,7 +112,11 @@ export function LibraryPage() {
 
       <div className="space-y-3">
         {rows.map((doc) => (
-          <article key={doc.id} className="rounded-xl border border-slate-200 bg-white p-4">
+          <article
+            id={`record-${doc.id}`}
+            key={doc.id}
+            className={`rounded-xl border border-slate-200 bg-white p-4 ${focusClass(focusId, doc.id)}`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

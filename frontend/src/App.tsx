@@ -10,6 +10,7 @@ import { PublicationsPage } from '@/features/publications/PublicationsPage'
 import { LibraryPage } from '@/features/library/LibraryPage'
 import { ComplaintsPage } from '@/features/complaints/ComplaintsPage'
 import { TasksPage } from '@/features/tasks/TasksPage'
+import { SearchProvider } from '@/features/search/SearchContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,18 +27,20 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <AuthGate>
-            <Routes>
-              <Route element={<AppShell />}>
-                <Route index element={<Navigate to="/overview" replace />} />
-                <Route path="overview" element={<OverviewPage />} />
-                <Route path="notams" element={<NotamsPage />} />
-                <Route path="publications" element={<PublicationsPage />} />
-                <Route path="library" element={<LibraryPage />} />
-                <Route path="complaints" element={<ComplaintsPage />} />
-                <Route path="tasks" element={<TasksPage />} />
-                <Route path="users" element={<UsersPage />} />
-              </Route>
-            </Routes>
+            <SearchProvider>
+              <Routes>
+                <Route element={<AppShell />}>
+                  <Route index element={<Navigate to="/overview" replace />} />
+                  <Route path="overview" element={<OverviewPage />} />
+                  <Route path="notams" element={<NotamsPage />} />
+                  <Route path="publications" element={<PublicationsPage />} />
+                  <Route path="library" element={<LibraryPage />} />
+                  <Route path="complaints" element={<ComplaintsPage />} />
+                  <Route path="tasks" element={<TasksPage />} />
+                  <Route path="users" element={<UsersPage />} />
+                </Route>
+              </Routes>
+            </SearchProvider>
           </AuthGate>
         </BrowserRouter>
       </AuthProvider>

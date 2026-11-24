@@ -1,8 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
+import { useDeferredValue } from 'react'
 import { Link } from 'react-router-dom'
+import { useSearch } from '@/features/search/SearchContext'
 import * as notamApi from '@/services/notamApi'
 import * as publicationApi from '@/services/publicationApi'
-import type { AiracCycle } from '@/types/notam'
+import * as searchApi from '@/services/searchApi'
+import type { AiracCycle, AttentionItem } from '@/types/notam'
+
+function hitHref(href: string, id: string) {
+  const url = new URL(href, window.location.origin)
+  url.searchParams.set('focus', id)
+  return `${url.pathname}${url.search}`
+}
 
 function formatDate(iso: string) {
   return new Intl.DateTimeFormat('en-GB', {
@@ -48,7 +57,103 @@ function statusChipClass(status: string) {
   return 'bg-amber-50 text-warn'
 }
 
+const groupLabels: Record<string, string> = {
+  notams: 'NOTAMs',
+  publications: 'Publications',
+  library: 'AIS library',
+  complaints: 'Complaints',
+  tasks: 'Tasks',
+}
+
+function SearchResults({ query }: { query: string }) {
+  const { setQuery } = useSearch()
+  const deferred = useDeferredValue(query.trim())
+  const results = useQuery({
+    queryKey: ['search', deferred],
+    queryFn: () => searchApi.searchAll(deferred),
+    enabled: deferred.length >= 2,
+  })
+
+  if (deferred.length < 2) {
+    return <p className="text-sm text-muted">Type at least two characters to search.</p>
+  }
+
+  if (results.isLoading) {
+    return <p className="text-sm text-muted">Searching…</p>
+  }
+
+  const groups = results.data?.groups
+  const entries = groups
+    ? (Object.keys(groupLabels) as (keyof typeof groupLabels)[])
+        .map((key) => ({ key, label: groupLabels[key], hits: groups[key as keyof typeof groups] ?? [] }))
+        .filter((g) => g.hits.length > 0)
+    : []
+
+  if (entries.length === 0) {
+    return <p className="text-sm text-muted">No matches for “{deferred}”.</p>
+  }
+
+  return (
+    <div className="space-y-5">
+      {entries.map((group) => (
+        <div key={group.key}>
+          <h2 className="font-display text-lg font-semibold text-ink">{group.label}</h2>
+          <ul className="mt-2 space-y-2">
+            {group.hits.map((hit) => (
+              <li key={`${hit.type}-${hit.id}`}>
+                <Link
+                  to={hitHref(hit.href, hit.id)}
+                  onClick={() => setQuery('')}
+                  className="block rounded-lg border border-slate-200 bg-white px-3 py-2 hover:border-brand/40"
+                >
+                  <p className="text-sm font-semibold text-ink">{hit.title}</p>
+                  {hit.subtitle ? <p className="text-xs text-muted">{hit.subtitle}</p> : null}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AttentionList({ items }: { items: AttentionItem[] }) {
+  if (items.length === 0) {
+    return <p className="mt-2 text-sm text-muted">Nothing overdue or incomplete yet.</p>
+  }
+  return (
+    <ul className="mt-3 space-y-2">
+      {items.map((item, idx) => (
+        <li key={`${item.type}-${item.title}-${idx}`}>
+          <Link
+            to={item.href}
+            className={`flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2 ${
+              item.severity === 'critical'
+                ? 'border-red-200 bg-red-50/60'
+                : 'border-amber-200 bg-amber-50/50'
+            }`}
+          >
+            <div>
+              <p className="text-sm font-semibold text-ink">{item.title}</p>
+              <p className="text-xs text-muted">{item.detail}</p>
+            </div>
+            <span
+              className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                item.severity === 'critical' ? 'bg-red-100 text-danger' : 'bg-amber-100 text-warn'
+              }`}
+            >
+              {item.severity}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function OverviewPage() {
+  const { query } = useSearch()
   const summary = useQuery({
     queryKey: ['dashboard'],
     queryFn: notamApi.fetchDashboardSummary,
@@ -57,6 +162,18 @@ export function OverviewPage() {
     queryKey: ['publications'],
     queryFn: publicationApi.listPublications,
   })
+
+  if (query.trim()) {
+    return (
+      <section className="space-y-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold text-ink">Search</h1>
+          <p className="mt-2 text-muted">Results across NOTAMs, publications, library, complaints and tasks.</p>
+        </div>
+        <SearchResults query={query} />
+      </section>
+    )
+  }
 
   const tiles = [
     { label: 'NOTAMs logged', value: summary.data?.notamsLogged ?? '—', to: '/notams' },
@@ -72,6 +189,7 @@ export function OverviewPage() {
   const comingIntoEffect = (publications.data ?? [])
     .filter((p) => p.status !== 'Cancelled' && p.effective >= today)
     .slice(0, 6)
+  const attention = summary.data?.needsAttention ?? []
 
   return (
     <section className="space-y-6">
@@ -112,7 +230,7 @@ export function OverviewPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="font-display text-lg font-semibold">Needs attention</h2>
-        <p className="mt-2 text-sm text-muted">Nothing overdue or incomplete yet.</p>
+        <AttentionList items={attention} />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
