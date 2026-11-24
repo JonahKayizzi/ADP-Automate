@@ -1,3 +1,4 @@
+import { calculateConfidence } from './confidence'
 import {
   Field,
   PillGroup,
@@ -60,10 +61,27 @@ function set(payload: Record<string, unknown>, key: string, value: unknown, onCh
   onChange({ ...payload, [key]: value })
 }
 
+function ConfidenceBanner({ payload }: { payload: Record<string, unknown> }) {
+  const result = calculateConfidence(payload)
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-sm font-semibold text-ink">
+        Confidence level {result.percent}%
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        {result.scored100} of {result.scoredTotal} checks scored at 100%
+        {result.naOrBlank > 0 ? ` · ${result.naOrBlank} N/A or blank excluded` : ''}
+        {' '}· share of scored checks at 100%
+      </p>
+    </div>
+  )
+}
+
 function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
   const completeness = asArray<CompletenessRow>(payload.completeness)
   const aixm = asArray<AixmRow>(payload.aixmChecklist)
   const aixmIncluded = asBool(payload.aixmIncluded)
+  const column = completeness[0]?.column
 
   return (
     <div className="space-y-5">
@@ -126,13 +144,12 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
       </section>
 
       <section className="space-y-3">
-        <h3 className="font-display text-base font-semibold">Completeness</h3>
+        <h3 className="font-display text-base font-semibold">
+          Completeness{column ? ` (${column})` : ''}
+        </h3>
         {completeness.map((row, idx) => (
           <div key={row.item} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">{row.item}</p>
-              <p className="text-xs text-muted">{row.column}</p>
-            </div>
+            <p className="text-sm font-medium">{row.item}</p>
             <PillGroup
               value={row.value}
               options={pctNaOptions}
@@ -163,7 +180,7 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
                 <p className="text-sm">{row.item}</p>
                 <PillGroup
                   value={row.value}
-                  options={yesNoOptions}
+                  options={pctNaOptions}
                   disabled={locked}
                   onChange={(v) => {
                     const next = aixm.map((r, i) => (i === idx ? { ...r, value: v } : r))
@@ -175,6 +192,8 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
           </div>
         ) : null}
       </section>
+
+      <ConfidenceBanner payload={payload} />
     </div>
   )
 }
@@ -364,35 +383,45 @@ function Of83c({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <h3 className="font-display text-base font-semibold">Systems</h3>
-        {systems.map((system, sIdx) => (
-          <div key={system.name} className="rounded-md border bg-white p-3">
-            <p className="text-sm font-semibold">{system.name}</p>
-            <div className="mt-2 space-y-2">
-              {system.steps.map((step, stepIdx) => (
-                <div key={step.label} className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm">{step.label}</span>
-                  <PillGroup
-                    value={step.done}
-                    options={yesNoOptions}
-                    disabled={locked}
-                    onChange={(v) => {
-                      const next = systems.map((s, i) =>
-                        i === sIdx
-                          ? {
-                              ...s,
-                              steps: s.steps.map((st, j) => (j === stepIdx ? { ...st, done: v } : st)),
-                            }
-                          : s
-                      )
-                      set(payload, 'systems', next, onChange)
-                    }}
-                  />
-                </div>
-              ))}
+        <h3 className="font-display text-base font-semibold">Processing steps by system</h3>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {systems.map((system, sIdx) => (
+            <div key={system.name} className="rounded-md border bg-white p-3">
+              <p className="text-sm font-semibold text-ink">{system.name}</p>
+              <ul className="mt-2 space-y-1.5">
+                {system.steps.map((step, stepIdx) => {
+                  const checked = step.done === 'Yes'
+                  return (
+                    <li key={step.label}>
+                      <label className="flex items-start gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={checked}
+                          disabled={locked}
+                          onChange={(e) => {
+                            const next = systems.map((s, i) =>
+                              i === sIdx
+                                ? {
+                                    ...s,
+                                    steps: s.steps.map((st, j) =>
+                                      j === stepIdx ? { ...st, done: e.target.checked ? 'Yes' : '' } : st
+                                    ),
+                                  }
+                                : s
+                            )
+                            set(payload, 'systems', next, onChange)
+                          }}
+                        />
+                        <span>{step.label}</span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
 
       <section className="space-y-3">
@@ -463,6 +492,7 @@ function Of83c({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
 
 function Of83d({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
   const completeness = asArray<CompletenessRow>(payload.completeness)
+  const column = completeness[0]?.column
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-3">
@@ -506,12 +536,15 @@ function Of83d({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
             onChange={(v) => set(payload, 'integrity', v, onChange)}
           />
         </Field>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Final draft review date">
             <TextInput type="date" value={asString(payload.finalDraftReviewDate)} disabled={locked} onChange={(v) => set(payload, 'finalDraftReviewDate', v, onChange)} />
           </Field>
           <Field label="Publication date">
             <TextInput type="date" value={asString(payload.publicationDate)} disabled={locked} onChange={(v) => set(payload, 'publicationDate', v, onChange)} />
+          </Field>
+          <Field label="File type">
+            <TextInput value={asString(payload.fileType)} disabled={locked} onChange={(v) => set(payload, 'fileType', v, onChange)} />
           </Field>
           <Field label="Applicable regulation(s)">
             <TextInput value={asString(payload.applicableRegulations)} disabled={locked} onChange={(v) => set(payload, 'applicableRegulations', v, onChange)} />
@@ -520,13 +553,12 @@ function Of83d({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
       </section>
 
       <section className="space-y-3">
-        <h3 className="font-display text-base font-semibold">Completeness</h3>
+        <h3 className="font-display text-base font-semibold">
+          Completeness{column ? ` (${column})` : ''}
+        </h3>
         {completeness.map((row, idx) => (
           <div key={row.item} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2">
-            <div>
-              <p className="text-sm font-medium">{row.item}</p>
-              <p className="text-xs text-muted">{row.column}</p>
-            </div>
+            <p className="text-sm font-medium">{row.item}</p>
             <PillGroup
               value={row.value}
               options={pctNaOptions}
@@ -540,9 +572,7 @@ function Of83d({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
         ))}
       </section>
 
-      <Field label="Confidence level">
-        <TextInput value={asString(payload.confidenceLevel)} disabled={locked} onChange={(v) => set(payload, 'confidenceLevel', v, onChange)} />
-      </Field>
+      <ConfidenceBanner payload={payload} />
     </div>
   )
 }

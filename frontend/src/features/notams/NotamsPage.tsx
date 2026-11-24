@@ -210,7 +210,10 @@ export function NotamsPage() {
               ownerType="notam"
               ownerId={notam.id}
               canEdit={canEdit}
-              emptyHint="No supporting document or NOTAM product file attached yet."
+              slots={[
+                { key: 'supporting', label: 'Supporting document' },
+                { key: 'product', label: 'NOTAM product file' },
+              ]}
             />
           </article>
         ))}

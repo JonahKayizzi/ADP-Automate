@@ -12,6 +12,7 @@ public final class AttachmentDtos {
       UUID id,
       String ownerType,
       UUID ownerId,
+      String slot,
       String originalFilename,
       String contentType,
       long sizeBytes,

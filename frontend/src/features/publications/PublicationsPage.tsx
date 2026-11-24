@@ -272,7 +272,7 @@ export function PublicationsPage() {
               ownerType="publication"
               ownerId={pub.id}
               canEdit={canEdit}
-              emptyHint="No file attached"
+              slots={[{ key: 'publication', label: 'Publication file' }]}
             />
           </article>
         ))}

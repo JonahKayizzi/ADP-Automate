@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { useDeferredValue } from 'react'
 import { Link } from 'react-router-dom'
 import { useSearch } from '@/features/search/SearchContext'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import * as notamApi from '@/services/notamApi'
 import * as publicationApi from '@/services/publicationApi'
 import * as searchApi from '@/services/searchApi'
 import type { AiracCycle, AttentionItem } from '@/types/notam'
+import type { Publication } from '@/types/publication'
 
 function hitHref(href: string, id: string) {
   const url = new URL(href, window.location.origin)
@@ -51,9 +52,17 @@ function AiracCard({ cycle }: { cycle: AiracCycle }) {
   )
 }
 
-function statusChipClass(status: string) {
-  if (status === 'Distributed') return 'bg-emerald-50 text-ok'
-  if (status === 'Cancelled') return 'bg-slate-100 text-slate-600'
+function statusChipClass(pub: Publication) {
+  if (pub.status === 'Distributed') return 'bg-emerald-50 text-ok'
+  if (pub.status === 'Cancelled') return 'bg-slate-100 text-slate-600'
+  if (
+    pub.status === 'Draft' &&
+    pub.airac &&
+    pub.daysToDeadline != null &&
+    pub.daysToDeadline < 0
+  ) {
+    return 'bg-red-50 text-danger'
+  }
   return 'bg-amber-50 text-warn'
 }
 
@@ -67,18 +76,18 @@ const groupLabels: Record<string, string> = {
 
 function SearchResults({ query }: { query: string }) {
   const { setQuery } = useSearch()
-  const deferred = useDeferredValue(query.trim())
+  const debounced = useDebouncedValue(query.trim(), 150)
   const results = useQuery({
-    queryKey: ['search', deferred],
-    queryFn: () => searchApi.searchAll(deferred),
-    enabled: deferred.length >= 2,
+    queryKey: ['search', debounced],
+    queryFn: () => searchApi.searchAll(debounced),
+    enabled: debounced.length >= 2,
   })
 
-  if (deferred.length < 2) {
+  if (debounced.length < 2) {
     return <p className="text-sm text-muted">Type at least two characters to search.</p>
   }
 
-  if (results.isLoading) {
+  if (results.isLoading || results.isFetching) {
     return <p className="text-sm text-muted">Searching…</p>
   }
 
@@ -90,7 +99,7 @@ function SearchResults({ query }: { query: string }) {
     : []
 
   if (entries.length === 0) {
-    return <p className="text-sm text-muted">No matches for “{deferred}”.</p>
+    return <p className="text-sm text-muted">No matches for “{debounced}”.</p>
   }
 
   return (
@@ -188,6 +197,8 @@ export function OverviewPage() {
   const today = summary.data?.today ?? ''
   const comingIntoEffect = (publications.data ?? [])
     .filter((p) => p.status !== 'Cancelled' && p.effective >= today)
+    .slice()
+    .sort((a, b) => a.effective.localeCompare(b.effective))
     .slice(0, 6)
   const attention = summary.data?.needsAttention ?? []
 
@@ -265,7 +276,7 @@ export function OverviewPage() {
                     {pub.title} · {formatDate(pub.effective)}
                   </p>
                 </div>
-                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${statusChipClass(pub.status)}`}>
+                <span className={`rounded px-2 py-0.5 text-xs font-semibold ${statusChipClass(pub)}`}>
                   {pub.status}
                 </span>
               </li>

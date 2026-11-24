@@ -77,10 +77,11 @@ public class AttachmentService {
   }
 
   @Transactional
-  public AttachmentResponse upload(String ownerTypeLabel, UUID ownerId, MultipartFile file) {
+  public AttachmentResponse upload(String ownerTypeLabel, UUID ownerId, String slotLabel, MultipartFile file) {
     AccountPrincipal actor = requireEditor();
     AttachmentOwnerType ownerType = parseOwnerType(ownerTypeLabel);
     requireOwnerExists(ownerType, ownerId);
+    String slot = normalizeSlot(ownerType, slotLabel);
 
     if (file == null || file.isEmpty()) {
       throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Choose a file to upload.", "file");
@@ -100,6 +101,11 @@ public class AttachmentService {
       );
     }
 
+    Instant now = Instant.now();
+    if (slot != null) {
+      retireSlot(ownerType, ownerId, slot, actor, now);
+    }
+
     UUID id = UUID.randomUUID();
     String storageKey = ownerType.getLabel() + "/" + ownerId + "/" + id + "." + extension;
     String sha256;
@@ -114,11 +120,11 @@ public class AttachmentService {
       throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "storage", "Could not store the uploaded file.");
     }
 
-    Instant now = Instant.now();
     Attachment attachment = new Attachment();
     attachment.setId(id);
     attachment.setOwnerType(ownerType);
     attachment.setOwnerId(ownerId);
+    attachment.setSlot(slot);
     attachment.setOriginalFilename(original);
     attachment.setContentType(resolveContentType(file.getContentType(), extension));
     attachment.setSizeBytes(file.getSize());
@@ -132,6 +138,65 @@ public class AttachmentService {
     attachment.setUpdatedByAccount(actor.getUsername());
     attachments.save(attachment);
     return toResponse(attachment);
+  }
+
+  private void retireSlot(
+      AttachmentOwnerType ownerType,
+      UUID ownerId,
+      String slot,
+      AccountPrincipal actor,
+      Instant now
+  ) {
+    List<Attachment> existing =
+        attachments.findByOwnerTypeAndOwnerIdAndSlotAndRetiredFalse(ownerType, ownerId, slot);
+    for (Attachment previous : existing) {
+      previous.setRetired(true);
+      previous.setUpdatedAt(now);
+      previous.setUpdatedByAccount(actor.getUsername());
+    }
+    if (!existing.isEmpty()) {
+      attachments.saveAll(existing);
+    }
+  }
+
+  /**
+   * NOTAM: supporting | product. Publication: publication. Library: null (multi-attach).
+   */
+  static String normalizeSlot(AttachmentOwnerType ownerType, String slotLabel) {
+    String slot = slotLabel == null || slotLabel.isBlank() ? null : slotLabel.trim().toLowerCase(Locale.ROOT);
+    return switch (ownerType) {
+      case LIBRARY -> null;
+      case NOTAM -> {
+        if (slot == null) {
+          throw new ApiException(
+              HttpStatus.BAD_REQUEST,
+              "validation",
+              "Choose a slot: supporting or product.",
+              "slot"
+          );
+        }
+        if (!"supporting".equals(slot) && !"product".equals(slot)) {
+          throw new ApiException(
+              HttpStatus.BAD_REQUEST,
+              "validation",
+              "NOTAM slot must be supporting or product.",
+              "slot"
+          );
+        }
+        yield slot;
+      }
+      case PUBLICATION -> {
+        if (slot == null || "publication".equals(slot) || "file".equals(slot)) {
+          yield "publication";
+        }
+        throw new ApiException(
+            HttpStatus.BAD_REQUEST,
+            "validation",
+            "Publication slot must be publication.",
+            "slot"
+        );
+      }
+    };
   }
 
   @Transactional(readOnly = true)
@@ -193,6 +258,7 @@ public class AttachmentService {
         attachment.getId(),
         attachment.getOwnerType().getLabel(),
         attachment.getOwnerId(),
+        attachment.getSlot(),
         attachment.getOriginalFilename(),
         attachment.getContentType(),
         attachment.getSizeBytes(),

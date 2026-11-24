@@ -24,6 +24,10 @@ public class Attachment {
   @Column(name = "owner_id", nullable = false)
   private UUID ownerId;
 
+  /** Typed slot: supporting | product | publication; null for library multi-attach. */
+  @Column(length = 32)
+  private String slot;
+
   @Column(name = "original_filename", nullable = false, length = 500)
   private String originalFilename;
 
@@ -79,6 +83,14 @@ public class Attachment {
 
   public void setOwnerId(UUID ownerId) {
     this.ownerId = ownerId;
+  }
+
+  public String getSlot() {
+    return slot;
+  }
+
+  public void setSlot(String slot) {
+    this.slot = slot;
   }
 
   public String getOriginalFilename() {
