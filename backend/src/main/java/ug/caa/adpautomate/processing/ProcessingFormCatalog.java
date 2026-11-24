@@ -63,57 +63,115 @@ final class ProcessingFormCatalog {
     );
   }
 
+  /**
+   * AIC/NOTAM/SUP metadata (OF/83b) — 14 principal fields from MANSOPS / prototype.
+   */
   private static FormDef of83b() {
-    Map<String, Object> payload = new LinkedHashMap<>();
-    List<Map<String, Object>> rows = new ArrayList<>();
-    for (String label : List.of(
-        "Originator",
-        "NOTAM / AIC / SUP number",
-        "Subject",
-        "Purpose",
-        "Scope",
-        "Effective date / time",
-        "Valid until",
-        "Lower / upper limit",
-        "Coordinates / location",
-        "Q-line / schedule",
-        "Text of NOTAM / AIC / SUP",
-        "References",
-        "Remarks",
-        "Distribution"
-    )) {
-      Map<String, Object> row = new LinkedHashMap<>();
-      row.put("label", label);
-      row.put("value", "");
-      rows.add(row);
-    }
-    payload.put("rows", rows);
     return new FormDef(
         2,
         "UCAA/DANS/AIM/OF/83b",
         "AIC/NOTAM/SUP meta data form",
         "Controlled document — MANSOPS Part III (Rev 04, 01/08/2023)",
         List.of(new SlotDef("preparedBy", "Prepared by")),
-        payload
+        emptyOf83b()
     );
   }
 
+  /**
+   * AIP amendment metadata (OF/83a) — ADQ / operation fields plus shared quality/tool rows.
+   */
   private static FormDef of83a() {
-    Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("adqCompliance", "");
-    payload.put("reviewDate", "");
-    payload.put("operation", "");
-    payload.put("effectiveDate", "");
-    payload.put("effectiveTime", "");
-    payload.put("notes", "");
     return new FormDef(
         2,
         "UCAA/DANS/AIM/OF/83a",
         "AIP meta data form",
         "Controlled document — MANSOPS Part III (Rev 04, 01/08/2023)",
         List.of(new SlotDef("preparedBy", "Prepared by")),
-        payload
+        emptyOf83a()
     );
+  }
+
+  static Map<String, Object> emptyOf83b() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    putBlank(payload,
+        "personResponsible",
+        "role",
+        "datePerformed",
+        "standardsApplied",
+        "effectiveDateTime",
+        "endDateTime",
+        "schedule",
+        "referenceSystem",
+        "methodUsed",
+        "qualityAccuracy",
+        "qualityResolution",
+        "conversionUsed",
+        "tool",
+        "toolVersion"
+    );
+    return payload;
+  }
+
+  static Map<String, Object> emptyOf83a() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    putBlank(payload,
+        "adqCompliance",
+        "reviewDate",
+        "personResponsible",
+        "role",
+        "operation",
+        "datePerformed",
+        "standardsApplied",
+        "effectiveDate",
+        "effectiveTime",
+        "referenceSystem",
+        "methodUsed",
+        "qualityAccuracy",
+        "qualityResolution",
+        "conversionUsed",
+        "tool",
+        "toolVersion"
+    );
+    return payload;
+  }
+
+  /**
+   * Merge a stored payload onto the current empty template so older forms pick up new keys
+   * and obsolete keys (e.g. legacy {@code rows}) are dropped from the working set.
+   */
+  static Map<String, Object> normalizePayload(String formCode, Map<String, Object> stored) {
+    Map<String, Object> template = templateFor(formCode);
+    if (template == null) {
+      return stored == null ? new LinkedHashMap<>() : new LinkedHashMap<>(stored);
+    }
+    Map<String, Object> merged = new LinkedHashMap<>(template);
+    if (stored != null) {
+      for (String key : template.keySet()) {
+        if (stored.containsKey(key) && stored.get(key) != null) {
+          merged.put(key, stored.get(key));
+        }
+      }
+    }
+    return merged;
+  }
+
+  private static Map<String, Object> templateFor(String formCode) {
+    if (formCode == null) {
+      return null;
+    }
+    if (formCode.endsWith("/OF/83b")) {
+      return emptyOf83b();
+    }
+    if (formCode.endsWith("/OF/83a")) {
+      return emptyOf83a();
+    }
+    return null;
+  }
+
+  private static void putBlank(Map<String, Object> payload, String... keys) {
+    for (String key : keys) {
+      payload.put(key, "");
+    }
   }
 
   private static FormDef of83c() {
