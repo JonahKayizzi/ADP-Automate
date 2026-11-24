@@ -75,4 +75,43 @@ class ProcessingFormCatalogTest {
     assertFalse(normalized.containsKey("rows"));
     assertFalse(normalized.containsKey("unknownExtra"));
   }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void of83cHasNineSystemsWithNotamPromulgationSteps() {
+    Map<String, Object> payload = ProcessingFormCatalog.emptyOf83c();
+    List<Map<String, Object>> systems = (List<Map<String, Object>>) payload.get("systems");
+    assertEquals(9, systems.size());
+    Map<String, Object> notam = systems.stream()
+        .filter(s -> "NOTAM".equals(s.get("name")))
+        .findFirst()
+        .orElseThrow();
+    List<Map<String, Object>> steps = (List<Map<String, Object>>) notam.get("steps");
+    assertEquals(5, steps.size());
+    assertEquals("Prepare NOTAM promulgation form", steps.get(0).get("label"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void normalizeOf83cPreservesCheckedSteps() {
+    Map<String, Object> stored = ProcessingFormCatalog.emptyOf83c();
+    List<Map<String, Object>> systems = (List<Map<String, Object>>) stored.get("systems");
+    Map<String, Object> notam = systems.stream()
+        .filter(s -> "NOTAM".equals(s.get("name")))
+        .findFirst()
+        .orElseThrow();
+    List<Map<String, Object>> steps = (List<Map<String, Object>>) notam.get("steps");
+    steps.get(0).put("done", "Yes");
+
+    Map<String, Object> normalized =
+        ProcessingFormCatalog.normalizePayload("UCAA/DANS/AIM/OF/83c", stored);
+    List<Map<String, Object>> mergedSystems = (List<Map<String, Object>>) normalized.get("systems");
+    Map<String, Object> mergedNotam = mergedSystems.stream()
+        .filter(s -> "NOTAM".equals(s.get("name")))
+        .findFirst()
+        .orElseThrow();
+    List<Map<String, Object>> mergedSteps = (List<Map<String, Object>>) mergedNotam.get("steps");
+    assertEquals("Yes", mergedSteps.get(0).get("done"));
+    assertEquals("", mergedSteps.get(1).get("done"));
+  }
 }

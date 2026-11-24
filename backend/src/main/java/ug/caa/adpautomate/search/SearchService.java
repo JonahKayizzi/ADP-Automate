@@ -8,17 +8,20 @@ import ug.caa.adpautomate.notam.NotamRepository;
 import ug.caa.adpautomate.publication.PublicationRepository;
 import ug.caa.adpautomate.task.TaskRepository;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Service
 public class SearchService {
 
-  private static final int LIMIT = 12;
+  /** Max hits returned per module group. */
+  static final int LIMIT = 12;
 
   private final NotamRepository notams;
   private final PublicationRepository publications;
@@ -53,12 +56,12 @@ public class SearchService {
       return groups;
     }
 
-    String needle = q.toLowerCase(Locale.ROOT);
+    List<String> terms = tokenize(q);
 
     groups.put(
         "notams",
         notams.findByRetiredFalseOrderByIssuedDescCreatedAtDesc().stream()
-            .filter(n -> matches(needle, n.getNumber(), n.getTitle(), n.getOriginator().getLabel()))
+            .filter(n -> matches(terms, n.getNumber(), n.getTitle(), n.getOriginator().getLabel()))
             .limit(LIMIT)
             .map(n -> new Hit(
                 n.getId(),
@@ -73,7 +76,7 @@ public class SearchService {
     groups.put(
         "publications",
         publications.findByRetiredFalseOrderByEffectiveDescCreatedAtDesc().stream()
-            .filter(p -> matches(needle, p.getNumber(), p.getTitle(), p.getType().getLabel(), p.getStatus().getLabel()))
+            .filter(p -> matches(terms, p.getNumber(), p.getTitle(), p.getType().getLabel(), p.getStatus().getLabel()))
             .limit(LIMIT)
             .map(p -> new Hit(
                 p.getId(),
@@ -88,7 +91,7 @@ public class SearchService {
     groups.put(
         "library",
         libraryDocuments.findByRetiredFalseOrderByDocTypeAscTitleAsc().stream()
-            .filter(d -> matches(needle, d.getTitle(), d.getEdition(), d.getDocType().getLabel()))
+            .filter(d -> matches(terms, d.getTitle(), d.getEdition(), d.getDocType().getLabel()))
             .limit(LIMIT)
             .map(d -> new Hit(
                 d.getId(),
@@ -104,7 +107,7 @@ public class SearchService {
         "complaints",
         complaints.findByRetiredFalseOrderByReceivedDescCreatedAtDesc().stream()
             .filter(c -> matches(
-                needle,
+                terms,
                 c.getTitle(),
                 c.getComplainant(),
                 c.getChannel().getLabel(),
@@ -126,7 +129,7 @@ public class SearchService {
     groups.put(
         "tasks",
         tasks.findByRetiredFalse().stream()
-            .filter(t -> matches(needle, t.getTitle(), t.getAssigneeName(), t.getStatus().getLabel()))
+            .filter(t -> matches(terms, t.getTitle(), t.getAssigneeName(), t.getStatus().getLabel()))
             .limit(LIMIT)
             .map(t -> new Hit(
                 t.getId(),
@@ -141,10 +144,31 @@ public class SearchService {
     return groups;
   }
 
-  private static boolean matches(String needle, String... fields) {
-    return Stream.of(fields)
+  /**
+   * Case-insensitive; every space-separated term must appear in the record's text fields
+   * (ids and secrets are never passed here).
+   */
+  static boolean matches(List<String> terms, String... fields) {
+    if (terms == null || terms.isEmpty()) {
+      return false;
+    }
+    String haystack = Stream.of(fields)
         .filter(field -> field != null && !field.isBlank())
-        .anyMatch(field -> field.toLowerCase(Locale.ROOT).contains(needle));
+        .map(field -> field.toLowerCase(Locale.ROOT))
+        .collect(Collectors.joining(" "));
+    if (haystack.isBlank()) {
+      return false;
+    }
+    return terms.stream().allMatch(haystack::contains);
+  }
+
+  static List<String> tokenize(String query) {
+    if (query == null || query.isBlank()) {
+      return List.of();
+    }
+    return Arrays.stream(query.toLowerCase(Locale.ROOT).trim().split("\\s+"))
+        .filter(t -> !t.isBlank())
+        .toList();
   }
 
   public record Hit(UUID id, String type, String title, String subtitle, String href) {

@@ -45,9 +45,10 @@ public class AttachmentController {
   public AttachmentResponse upload(
       @RequestParam String ownerType,
       @RequestParam UUID ownerId,
+      @RequestParam(required = false) String slot,
       @RequestParam("file") MultipartFile file
   ) {
-    return attachmentService.upload(ownerType, ownerId, file);
+    return attachmentService.upload(ownerType, ownerId, slot, file);
   }
 
   @GetMapping("/{id}/download")

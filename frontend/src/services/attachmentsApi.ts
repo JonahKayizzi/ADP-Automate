@@ -11,11 +11,13 @@ export function listAttachments(ownerType: AttachmentOwnerType, ownerId: string)
 export async function uploadAttachment(
   ownerType: AttachmentOwnerType,
   ownerId: string,
-  file: File
+  file: File,
+  slot?: string | null
 ): Promise<Attachment> {
   const body = new FormData()
   body.append('ownerType', ownerType)
   body.append('ownerId', ownerId)
+  if (slot) body.append('slot', slot)
   body.append('file', file)
 
   const res = await fetch(`${API_BASE}/attachments`, {

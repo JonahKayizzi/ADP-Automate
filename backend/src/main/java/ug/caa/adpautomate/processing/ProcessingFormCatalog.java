@@ -48,8 +48,9 @@ final class ProcessingFormCatalog {
     payload.put("publicationDate", "");
     payload.put("fileType", "");
     payload.put("aixmIncluded", false);
-    payload.put("completeness", defaultCompleteness(recordKind));
+    payload.put("completeness", defaultCompleteness(recordKind, false));
     payload.put("aixmChecklist", defaultAixmChecklist());
+    payload.put("confidenceLevel", "");
     return new FormDef(
         1,
         "UCAA/DANS/AIM/OF/82",
@@ -140,6 +141,9 @@ final class ProcessingFormCatalog {
    * and obsolete keys (e.g. legacy {@code rows}) are dropped from the working set.
    */
   static Map<String, Object> normalizePayload(String formCode, Map<String, Object> stored) {
+    if (formCode != null && formCode.endsWith("/OF/83c")) {
+      return normalizeOf83c(stored);
+    }
     Map<String, Object> template = templateFor(formCode);
     if (template == null) {
       return stored == null ? new LinkedHashMap<>() : new LinkedHashMap<>(stored);
@@ -175,29 +179,146 @@ final class ProcessingFormCatalog {
   }
 
   private static FormDef of83c() {
+    return new FormDef(
+        3,
+        "UCAA/DANS/AIM/OF/83c",
+        "Raw data processing form (Part I)",
+        "Controlled document — MANSOPS Part III (Rev 04, 01/08/2023)",
+        List.of(
+            new SlotDef("update", "Update"),
+            new SlotDef("firstCheck", "1st Check"),
+            new SlotDef("secondCheck", "2nd Check")
+        ),
+        emptyOf83c()
+    );
+  }
+
+  static Map<String, Object> emptyOf83c() {
     Map<String, Object> payload = new LinkedHashMap<>();
-    List<Map<String, Object>> systems = new ArrayList<>();
-    for (String name : List.of(
-        "AIM Static Database",
-        "ACM",
-        "Framemaker Text",
-        "Graphics",
-        "AIP-AIM Static Database Data Linkage",
-        "Esri Database",
-        "AIS Static Database",
-        "NOTAM",
-        "Data sets"
-    )) {
+    payload.put("systems", defaultSystems());
+    payload.put("part1", defaultPart1());
+    return payload;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> normalizeOf83c(Map<String, Object> stored) {
+    Map<String, Object> template = emptyOf83c();
+    if (stored == null) {
+      return template;
+    }
+    List<Map<String, Object>> templateSystems = (List<Map<String, Object>>) template.get("systems");
+    List<Map<String, Object>> storedSystems = stored.get("systems") instanceof List<?> list
+        ? (List<Map<String, Object>>) (List<?>) list
+        : List.of();
+    List<Map<String, Object>> mergedSystems = new ArrayList<>();
+    for (Map<String, Object> systemTemplate : templateSystems) {
+      String name = String.valueOf(systemTemplate.get("name"));
+      Map<String, Object> storedSystem = storedSystems.stream()
+          .filter(s -> name.equals(String.valueOf(s.get("name"))))
+          .findFirst()
+          .orElse(null);
       Map<String, Object> system = new LinkedHashMap<>();
       system.put("name", name);
-      system.put("steps", List.of(
-          Map.of("label", "Data prepared", "done", ""),
-          Map.of("label", "Data entered / updated", "done", ""),
-          Map.of("label", "Verified", "done", "")
-      ));
-      systems.add(system);
+      List<Map<String, Object>> templateSteps = (List<Map<String, Object>>) systemTemplate.get("steps");
+      List<Map<String, Object>> storedSteps = storedSystem != null && storedSystem.get("steps") instanceof List<?>
+          ? (List<Map<String, Object>>) storedSystem.get("steps")
+          : List.of();
+      List<Map<String, Object>> steps = new ArrayList<>();
+      for (Map<String, Object> stepTemplate : templateSteps) {
+        String label = String.valueOf(stepTemplate.get("label"));
+        String done = "";
+        for (Map<String, Object> storedStep : storedSteps) {
+          if (label.equals(String.valueOf(storedStep.get("label"))) && storedStep.get("done") != null) {
+            done = String.valueOf(storedStep.get("done"));
+            break;
+          }
+        }
+        Map<String, Object> step = new LinkedHashMap<>();
+        step.put("label", label);
+        step.put("done", done);
+        steps.add(step);
+      }
+      system.put("steps", steps);
+      mergedSystems.add(system);
     }
-    payload.put("systems", systems);
+    template.put("systems", mergedSystems);
+
+    List<Map<String, Object>> templatePart1 = (List<Map<String, Object>>) template.get("part1");
+    List<Map<String, Object>> storedPart1 = stored.get("part1") instanceof List<?> list
+        ? (List<Map<String, Object>>) (List<?>) list
+        : List.of();
+    List<Map<String, Object>> mergedPart1 = new ArrayList<>();
+    for (Map<String, Object> rowTemplate : templatePart1) {
+      String label = String.valueOf(rowTemplate.get("label"));
+      Map<String, Object> storedRow = storedPart1.stream()
+          .filter(r -> label.equals(String.valueOf(r.get("label"))))
+          .findFirst()
+          .orElse(null);
+      Map<String, Object> row = new LinkedHashMap<>(rowTemplate);
+      if (storedRow != null) {
+        for (String key : List.of("description", "completed", "remarks", "date", "by")) {
+          if (storedRow.get(key) != null) {
+            row.put(key, storedRow.get(key));
+          }
+        }
+      }
+      mergedPart1.add(row);
+    }
+    template.put("part1", mergedPart1);
+    return template;
+  }
+
+  private static List<Map<String, Object>> defaultSystems() {
+    List<Map<String, Object>> systems = new ArrayList<>();
+    systems.add(system("AIM Static Database", List.of(
+        "Insert data", "Edit data", "1st check", "Confirm 1st check", "2nd check", "Confirm 2nd check"
+    )));
+    systems.add(system("ACM", List.of(
+        "Insert data", "Edit data", "1st check", "Confirm"
+    )));
+    systems.add(system("Framemaker Text", List.of(
+        "Insert / update text", "Edit", "1st check", "Confirm"
+    )));
+    systems.add(system("Graphics", List.of(
+        "Insert / update graphic", "Edit", "1st check", "Confirm"
+    )));
+    systems.add(system("AIP-AIM Static Database Data Linkage", List.of(
+        "Link features", "Verify linkage", "1st check", "Confirm"
+    )));
+    systems.add(system("Esri Database", List.of(
+        "Insert data", "Edit data", "1st check", "Confirm"
+    )));
+    systems.add(system("AIS Static Database", List.of(
+        "Insert data", "Edit data", "1st check", "Confirm"
+    )));
+    systems.add(system("NOTAM", List.of(
+        "Prepare NOTAM promulgation form",
+        "1st check promulgation form",
+        "Confirm 1st check edits",
+        "2nd check promulgation form",
+        "Confirm 2nd check edits"
+    )));
+    systems.add(system("Data sets", List.of(
+        "Prepare data set", "Validate data set", "1st check", "Confirm"
+    )));
+    return systems;
+  }
+
+  private static Map<String, Object> system(String name, List<String> stepLabels) {
+    Map<String, Object> system = new LinkedHashMap<>();
+    system.put("name", name);
+    List<Map<String, Object>> steps = new ArrayList<>();
+    for (String label : stepLabels) {
+      Map<String, Object> step = new LinkedHashMap<>();
+      step.put("label", label);
+      step.put("done", "");
+      steps.add(step);
+    }
+    system.put("steps", steps);
+    return system;
+  }
+
+  private static List<Map<String, Object>> defaultPart1() {
     List<Map<String, Object>> part1 = new ArrayList<>();
     for (String label : List.of("Update", "1st Check", "2nd Check")) {
       Map<String, Object> row = new LinkedHashMap<>();
@@ -209,19 +330,7 @@ final class ProcessingFormCatalog {
       row.put("by", "");
       part1.add(row);
     }
-    payload.put("part1", part1);
-    return new FormDef(
-        3,
-        "UCAA/DANS/AIM/OF/83c",
-        "Raw data processing form (Part I)",
-        "Controlled document — MANSOPS Part III (Rev 04, 01/08/2023)",
-        List.of(
-            new SlotDef("update", "Update"),
-            new SlotDef("firstCheck", "1st Check"),
-            new SlotDef("secondCheck", "2nd Check")
-        ),
-        payload
-    );
+    return part1;
   }
 
   private static FormDef of83d(String recordKind) {
@@ -237,8 +346,9 @@ final class ProcessingFormCatalog {
     payload.put("integrity", "");
     payload.put("finalDraftReviewDate", "");
     payload.put("publicationDate", "");
+    payload.put("fileType", "");
     payload.put("applicableRegulations", "");
-    payload.put("completeness", defaultCompleteness(recordKind));
+    payload.put("completeness", defaultCompleteness(recordKind, true));
     payload.put("confidenceLevel", "");
     return new FormDef(
         4,
@@ -253,15 +363,9 @@ final class ProcessingFormCatalog {
     );
   }
 
-  private static List<Map<String, Object>> defaultCompleteness(String recordKind) {
-    String column = completenessColumn(recordKind);
-    List<String> items = List.of(
-        "All source data received",
-        "Coordinates verified",
-        "Effective dates confirmed",
-        "Cross-references checked",
-        "Layout / format reviewed"
-    );
+  private static List<Map<String, Object>> defaultCompleteness(String recordKind, boolean productQc) {
+    String column = completenessColumn(recordKind, productQc);
+    List<String> items = productQc ? productCompletenessItems(column) : rawCompletenessItems(column);
     List<Map<String, Object>> rows = new ArrayList<>();
     for (String item : items) {
       Map<String, Object> row = new LinkedHashMap<>();
@@ -271,6 +375,81 @@ final class ProcessingFormCatalog {
       rows.add(row);
     }
     return rows;
+  }
+
+  private static List<String> rawCompletenessItems(String column) {
+    if ("AIC".equals(column)) {
+      return List.of(
+          "Requirements declaration",
+          "Effective date/time",
+          "End date/time or PERM",
+          "Meta data for AIC",
+          "Signed promulgation form",
+          "Daily schedule",
+          "Approval from regulator",
+          "Safety assessment"
+      );
+    }
+    if ("AIP AMDT".equals(column) || "AIP".equals(column)) {
+      return List.of(
+          "Requirements declaration",
+          "Affected AIP section(s)",
+          "Effective date/time",
+          "Meta data for AIP AMDT",
+          "Signed promulgation form",
+          "Page checklist complete",
+          "Approval from regulator",
+          "Safety assessment"
+      );
+    }
+    return List.of(
+        "Requirements declaration",
+        "Effective date/time",
+        "End date/time",
+        "Meta data for AIP SUP/NOTAM",
+        "Signed promulgation form",
+        "Daily schedule",
+        "Approval from regulator",
+        "Safety assessment"
+    );
+  }
+
+  private static List<String> productCompletenessItems(String column) {
+    if ("AIC".equals(column)) {
+      return List.of(
+          "Serial number",
+          "Title of AIC",
+          "Effective date",
+          "End date or PERM",
+          "Subject / purpose stated",
+          "References complete",
+          "Publication date",
+          "Distribution list"
+      );
+    }
+    if ("AIP AMDT".equals(column)) {
+      return List.of(
+          "Serial number",
+          "Title of AIP AMDT",
+          "Affected section in the AIP",
+          "Effective date",
+          "Checklist of pages",
+          "Publication date",
+          "AIRAC ident (if AIRAC)",
+          "References / cancelled pages"
+      );
+    }
+    return List.of(
+        "Serial number",
+        "Distinctive pages",
+        "Title of AIP [AIRAC] SUP",
+        "Affected section in the AIP",
+        "Effective date and end time",
+        "Reference to NOTAM being cancelled",
+        "A publication date for AIP SUP",
+        "A publication and effective date for AIRAC AIP SUP",
+        "Reference to SUP(s) being replaced"
+    );
   }
 
   private static List<Map<String, Object>> defaultAixmChecklist() {
@@ -293,13 +472,13 @@ final class ProcessingFormCatalog {
     return rows;
   }
 
-  private static String completenessColumn(String recordKind) {
+  private static String completenessColumn(String recordKind, boolean productQc) {
     String upper = recordKind.toUpperCase();
     if (upper.contains("AIC")) {
       return "AIC";
     }
     if (upper.contains("AMDT")) {
-      return "AIP AMDT";
+      return productQc ? "AIP AMDT" : "AIP";
     }
     return "AIP SUP/NOTAM";
   }

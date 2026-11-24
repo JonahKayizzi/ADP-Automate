@@ -85,7 +85,9 @@ public class ProcessingFileService {
     }
 
     boolean hadSignatures = clearSignaturesIfPresent(form.getId());
-    form.setPayload(ProcessingFormCatalog.normalizePayload(form.getFormCode(), request.payload()));
+    Map<String, Object> payload = ProcessingFormCatalog.normalizePayload(form.getFormCode(), request.payload());
+    applyConfidence(form.getFormCode(), payload);
+    form.setPayload(payload);
     form.setStatus(ProcessingFormStatus.IN_PROGRESS);
     form.setUpdatedAt(Instant.now());
     form.setUpdatedByAccount(actor.getUsername());
@@ -115,6 +117,15 @@ public class ProcessingFileService {
     if (slot.isSigned()) {
       throw new ApiException(HttpStatus.CONFLICT, "signed", "This signature slot is already signed.");
     }
+
+    List<ProcessingSignature> existingSlots = signatures.findByFormIdOrderBySlotKeyAsc(form.getId());
+    SigningRules.validate(
+        form.getFormCode(),
+        form.getPayload(),
+        slotKey,
+        existingSlots,
+        actor.getUsername()
+    );
 
     String name = blankToNull(request == null ? null : request.signerName());
     String designation = blankToNull(request == null ? null : request.designation());
@@ -333,6 +344,16 @@ public class ProcessingFileService {
         slots,
         form.getUpdatedAt()
     );
+  }
+
+  private static void applyConfidence(String formCode, Map<String, Object> payload) {
+    if (formCode == null || payload == null) {
+      return;
+    }
+    if (formCode.endsWith("/OF/82") || formCode.endsWith("/OF/83d")) {
+      ConfidenceCalculator.Result result = ConfidenceCalculator.calculate(payload);
+      payload.put("confidenceLevel", ConfidenceCalculator.formatLevel(result));
+    }
   }
 
   @SuppressWarnings("unchecked")
