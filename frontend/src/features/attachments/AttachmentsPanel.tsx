@@ -21,10 +21,28 @@ type Props = {
   canEdit: boolean
   /** When set, each slot holds at most one file (replace on upload). */
   slots?: AttachmentSlotDef[]
+  /**
+   * When set with `slots`, only these slots show Attach/Replace.
+   * Other slots are listed when a file is present (inventory view).
+   */
+  attachableSlots?: AttachmentSlot[]
+  /** Hide empty non-attachable slots (list of attached production files). */
+  hideEmpty?: boolean
+  /** Slot layout: grid (default) or stacked rows. */
+  layout?: 'grid' | 'rows'
   emptyHint?: string
 }
 
-export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint }: Props) {
+export function AttachmentsPanel({
+  ownerType,
+  ownerId,
+  canEdit,
+  slots,
+  attachableSlots,
+  hideEmpty,
+  layout = 'grid',
+  emptyHint,
+}: Props) {
   const qc = useQueryClient()
   const [error, setError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
@@ -95,11 +113,28 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
   )
 
   if (slots && slots.length > 0) {
+    const canAttach = (key: AttachmentSlot) =>
+      attachableSlots == null ? true : attachableSlots.includes(key)
+    const visibleSlots = slots.filter((slot) => {
+      if (!hideEmpty) return true
+      if (canAttach(slot.key)) return true
+      return rows.some((r) => r.slot === slot.key)
+    })
     const unslotted = rows.filter((r) => !r.slot || !slots.some((s) => s.key === r.slot))
+    const anyAttached = visibleSlots.some((s) => rows.some((r) => r.slot === s.key)) || unslotted.length > 0
     return (
-      <div className="mt-4 space-y-2">
-        <div className={`grid gap-2 ${slots.length > 1 ? 'sm:grid-cols-2' : ''}`}>
-          {slots.map((slot) => {
+      <div className="space-y-2">
+        {!list.isLoading && hideEmpty && !anyAttached && attachableSlots?.length === 0 ? (
+          <p className="text-xs text-muted">{emptyHint ?? 'No production files attached yet.'}</p>
+        ) : null}
+        <div
+          className={
+            layout === 'rows'
+              ? 'flex flex-col gap-2'
+              : `grid gap-2 ${visibleSlots.length > 1 ? 'sm:grid-cols-2 lg:grid-cols-3' : ''}`
+          }
+        >
+          {visibleSlots.map((slot) => {
             const file = rows.find((r) => r.slot === slot.key) ?? null
             return (
               <SlotCard
@@ -107,12 +142,14 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
                 label={slot.label}
                 file={file}
                 canEdit={canEdit}
+                canUpload={canAttach(slot.key)}
                 busy={upload.isPending}
                 confirmDeleteId={confirmDeleteId}
                 onConfirmDelete={setConfirmDeleteId}
                 onUpload={(f) => upload.mutate({ file: f, slot: slot.key })}
                 onRemove={(id) => remove.mutate(id)}
                 onDownloadError={setError}
+                compact={layout === 'rows'}
               />
             )
           })}
@@ -132,7 +169,9 @@ export function AttachmentsPanel({ ownerType, ownerId, canEdit, slots, emptyHint
         ) : null}
         {historyHint}
         {error ? <p className="text-xs text-danger">{error}</p> : null}
-        <p className="text-[11px] text-muted">PDF, TXT, CSV, JSON, XML, GML, MD, PNG, JPEG · max 20 MB</p>
+        {attachableSlots == null || attachableSlots.length > 0 ? (
+          <p className="text-[11px] text-muted">PDF, TXT, CSV, JSON, XML, GML, MD, PNG, JPEG · max 20 MB</p>
+        ) : null}
       </div>
     )
   }
@@ -177,28 +216,75 @@ function SlotCard({
   label,
   file,
   canEdit,
+  canUpload = true,
   busy,
   confirmDeleteId,
   onConfirmDelete,
   onUpload,
   onRemove,
   onDownloadError,
+  compact = false,
 }: {
   label: string
   file: Attachment | null
   canEdit: boolean
+  canUpload?: boolean
   busy: boolean
   confirmDeleteId: string | null
   onConfirmDelete: (id: string | null) => void
   onUpload: (file: File) => void
   onRemove: (id: string) => void
   onDownloadError: (msg: string) => void
+  compact?: boolean
 }) {
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+        <p className="w-44 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+        <div className="min-w-0 flex-1">
+          {file ? (
+            <button
+              type="button"
+              className="truncate text-sm font-medium text-brand hover:underline"
+              onClick={() =>
+                void attachmentsApi.downloadAttachment(file.id, file.originalFilename).catch((err) =>
+                  onDownloadError(err instanceof ApiError ? err.detail : 'Could not download the file.')
+                )
+              }
+            >
+              {file.originalFilename}
+              <span className="ml-1.5 text-xs font-normal text-muted">{formatSize(file.sizeBytes)}</span>
+            </button>
+          ) : (
+            <p className="text-xs text-muted">Not attached</p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {canEdit && canUpload ? (
+            <UploadButton busy={busy} label={file ? 'Replace' : 'Attach'} onFile={onUpload} />
+          ) : null}
+          {canEdit && file ? (
+            <button
+              type="button"
+              className="text-xs text-danger"
+              onClick={() => {
+                if (confirmDeleteId === file.id) onRemove(file.id)
+                else onConfirmDelete(file.id)
+              }}
+            >
+              {confirmDeleteId === file.id ? 'Confirm remove' : 'Remove'}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</h3>
-        {canEdit ? (
+        {canEdit && canUpload ? (
           <UploadButton
             busy={busy}
             label={file ? 'Replace' : 'Attach'}

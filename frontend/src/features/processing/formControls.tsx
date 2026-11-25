@@ -102,18 +102,23 @@ export function TextInput({
   disabled,
   onChange,
   type = 'text',
+  placeholder,
+  className,
 }: {
   value: string
   disabled?: boolean
   onChange: (v: string) => void
   type?: string
+  placeholder?: string
+  className?: string
 }) {
   return (
     <input
       type={type}
-      className="w-full rounded-md border px-3 py-2 text-sm disabled:bg-slate-50"
+      className={`w-full rounded-md border border-slate-200 px-3 py-2 text-sm disabled:bg-slate-50 ${className ?? ''}`}
       value={value}
       disabled={disabled}
+      placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
     />
   )

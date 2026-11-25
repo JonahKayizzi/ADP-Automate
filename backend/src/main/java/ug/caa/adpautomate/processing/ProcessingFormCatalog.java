@@ -51,6 +51,13 @@ final class ProcessingFormCatalog {
     payload.put("completeness", defaultCompleteness(recordKind, false));
     payload.put("aixmChecklist", defaultAixmChecklist());
     payload.put("confidenceLevel", "");
+    payload.put("confidenceManual", true);
+    payload.put("accuracyComment", "");
+    payload.put("resolutionComment", "");
+    payload.put("traceabilityComment", "");
+    payload.put("timelinessComment", "");
+    payload.put("formatComment", "");
+    payload.put("integrityComment", "");
     return new FormDef(
         1,
         "UCAA/DANS/AIM/OF/82",
@@ -141,8 +148,15 @@ final class ProcessingFormCatalog {
    * and obsolete keys (e.g. legacy {@code rows}) are dropped from the working set.
    */
   static Map<String, Object> normalizePayload(String formCode, Map<String, Object> stored) {
+    return normalizePayload(formCode, stored, null);
+  }
+
+  static Map<String, Object> normalizePayload(String formCode, Map<String, Object> stored, String recordKind) {
     if (formCode != null && formCode.endsWith("/OF/83c")) {
       return normalizeOf83c(stored);
+    }
+    if (formCode != null && formCode.endsWith("/OF/82")) {
+      return normalizeOf82(stored, recordKind);
     }
     Map<String, Object> template = templateFor(formCode);
     if (template == null) {
@@ -156,6 +170,98 @@ final class ProcessingFormCatalog {
         }
       }
     }
+    return merged;
+  }
+
+  private static Map<String, Object> emptyOf82Scalars() {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    putBlank(payload,
+        "findings",
+        "approver",
+        "approvalDate",
+        "accuracy",
+        "resolution",
+        "traceability",
+        "timeliness",
+        "format",
+        "integrity",
+        "dateReceived",
+        "publicationDate",
+        "fileType",
+        "confidenceLevel",
+        "accuracyComment",
+        "resolutionComment",
+        "traceabilityComment",
+        "timelinessComment",
+        "formatComment",
+        "integrityComment"
+    );
+    payload.put("aixmIncluded", false);
+    payload.put("confidenceManual", true);
+    payload.put("aixmChecklist", defaultAixmChecklist());
+    return payload;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> normalizeOf82(Map<String, Object> stored, String recordKind) {
+    Map<String, Object> template = emptyOf82Scalars();
+    Map<String, Object> merged = new LinkedHashMap<>(template);
+    if (stored != null) {
+      for (String key : template.keySet()) {
+        if ("aixmChecklist".equals(key)) {
+          continue;
+        }
+        if (stored.containsKey(key) && stored.get(key) != null) {
+          merged.put(key, stored.get(key));
+        }
+      }
+      if (stored.get("aixmChecklist") instanceof List<?> list && !list.isEmpty()) {
+        merged.put("aixmChecklist", list);
+      }
+    }
+
+    String kind = recordKind == null ? "" : recordKind;
+    List<Map<String, Object>> defaultRows = defaultCompleteness(kind, false);
+    Map<String, String> storedByItem = new LinkedHashMap<>();
+    String storedColumn = null;
+    if (stored != null && stored.get("completeness") instanceof List<?> rows) {
+      for (Object row : rows) {
+        if (row instanceof Map<?, ?> map) {
+          String item = String.valueOf(map.get("item"));
+          Object value = map.get("value");
+          storedByItem.put(item, value == null ? "" : String.valueOf(value));
+          if (storedColumn == null && map.get("column") != null) {
+            storedColumn = String.valueOf(map.get("column"));
+          }
+        }
+      }
+    }
+    // Drop removed checklist items from older AIP forms.
+    storedByItem.remove("Cross-references checked");
+    storedByItem.remove("Cross references checked");
+    storedByItem.remove(Of82AipSupport.REMOVED_ITEM_METADATA);
+    storedByItem.remove(Of82AipSupport.REMOVED_ITEM_REGULATOR);
+
+    boolean forceAipItems = Of82AipSupport.isAipRecord(kind)
+        || "AIP".equalsIgnoreCase(storedColumn)
+        || "AIP AMDT".equalsIgnoreCase(storedColumn)
+        || storedByItem.containsKey(Of82AipSupport.ITEM_SOURCE)
+        || storedByItem.containsKey("Affected AIP section(s)");
+    List<Map<String, Object>> completeness;
+    if (forceAipItems && Of82AipSupport.isAipRecord(kind)) {
+      completeness = defaultCompleteness(kind.isBlank() ? "AIP AMDT" : kind, false);
+    } else if (forceAipItems) {
+      completeness = defaultCompleteness("AIP AMDT", false);
+    } else {
+      completeness = defaultRows;
+    }
+    for (Map<String, Object> row : completeness) {
+      String item = String.valueOf(row.get("item"));
+      if (storedByItem.containsKey(item)) {
+        row.put("value", storedByItem.get(item));
+      }
+    }
+    merged.put("completeness", completeness);
     return merged;
   }
 
@@ -392,14 +498,12 @@ final class ProcessingFormCatalog {
     }
     if ("AIP AMDT".equals(column) || "AIP".equals(column)) {
       return List.of(
-          "Requirements declaration",
-          "Affected AIP section(s)",
-          "Effective date/time",
-          "Meta data for AIP AMDT",
+          "All source data received",
+          "Coordinates verified",
+          "Effective dates confirmed",
+          "Layout / format reviewed",
           "Signed promulgation form",
-          "Page checklist complete",
-          "Approval from regulator",
-          "Safety assessment"
+          "Safety assessment if required"
       );
     }
     return List.of(

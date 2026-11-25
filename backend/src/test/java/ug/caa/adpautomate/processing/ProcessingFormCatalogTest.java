@@ -61,6 +61,27 @@ class ProcessingFormCatalogTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
+  void aipOf82CompletenessDropsCrossReferencesAndAddsAttachmentDrivenItems() {
+    Map<String, Object> payload = ProcessingFormCatalog.forRecordKind("AIRAC AIP AMDT").get(0).emptyPayload();
+    List<Map<String, Object>> completeness = (List<Map<String, Object>>) payload.get("completeness");
+    List<String> items = completeness.stream().map(r -> String.valueOf(r.get("item"))).toList();
+    assertEquals(
+        List.of(
+            "All source data received",
+            "Coordinates verified",
+            "Effective dates confirmed",
+            "Layout / format reviewed",
+            "Signed promulgation form",
+            "Safety assessment if required"
+        ),
+        items
+    );
+    assertTrue(payload.containsKey("accuracyComment"));
+    assertEquals(true, payload.get("confidenceManual"));
+  }
+
+  @Test
   void normalizeMergesKnownKeysAndDropsLegacyRows() {
     Map<String, Object> stored = new LinkedHashMap<>();
     stored.put("personResponsible", "Airspace planning officer");

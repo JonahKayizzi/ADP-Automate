@@ -32,6 +32,7 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
   const [toast, setToast] = useState('')
   const [error, setError] = useState('')
   const [confirmRevise, setConfirmRevise] = useState(false)
+  const [confirmClearSignatures, setConfirmClearSignatures] = useState(false)
   const [signerName, setSignerName] = useState(user?.displayName ?? '')
   const [designation, setDesignation] = useState(user?.designation ?? '')
 
@@ -45,6 +46,7 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
       setPayload(detail.data.payload)
       setError('')
       setConfirmRevise(false)
+      setConfirmClearSignatures(false)
     }
   }, [detail.data])
 
@@ -63,13 +65,10 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
   const save = useMutation({
     mutationFn: () => processingApi.saveForm(file.id, formSummary.id, payload),
     onSuccess: async (data) => {
-      const prevSigned = detail.data?.signatures.filter((s) => s.signed).length ?? 0
-      if (prevSigned > 0) {
-        setToast('Saving cleared existing signatures on this form.')
-      }
       setPayload(data.payload)
       await invalidate()
       setError('')
+      setToast('Form saved.')
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : 'Could not save the form.'),
   })
@@ -80,6 +79,7 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
     onSuccess: async () => {
       await invalidate()
       setError('')
+      setToast('Signature recorded. A different user can confirm when ready.')
     },
     onError: (err) => setError(err instanceof ApiError ? err.detail : 'Could not sign.'),
   })
@@ -95,6 +95,18 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
     onError: (err) => setError(err instanceof ApiError ? err.detail : 'Could not revise.'),
   })
 
+  const clearSignatures = useMutation({
+    mutationFn: () => processingApi.clearFormSignatures(file.id, formSummary.id),
+    onSuccess: async () => {
+      setConfirmClearSignatures(false)
+      await invalidate()
+      setError('')
+      setToast('Signatures cleared. You can edit and save the form again.')
+    },
+    onError: (err) =>
+      setError(err instanceof ApiError ? err.detail : 'Could not clear signatures.'),
+  })
+
   const revisions = useQuery({
     queryKey: ['processing-revisions', file.id, formSummary.id],
     queryFn: () => processingApi.listFormRevisions(file.id, formSummary.id),
@@ -102,6 +114,8 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
 
   const locked = detail.data?.locked ?? false
   const signatures = detail.data?.signatures ?? []
+  const partiallySigned = !locked && signatures.some((s) => s.signed)
+  const fieldsLocked = locked || !canEdit || partiallySigned
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-6">
@@ -187,13 +201,25 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
               Signed off — this form is locked.
             </div>
           ) : null}
+          {partiallySigned ? (
+            <div className="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-ink">
+              A signature is recorded. Form answers are locked so the next person can confirm. To change
+              answers, clear signatures first.
+            </div>
+          ) : null}
           {detail.isLoading ? <p className="text-sm text-muted">Loading form…</p> : null}
           {detail.data ? (
             <FormEditor
               formCode={detail.data.formCode}
               payload={payload}
-              locked={locked || !canEdit}
+              locked={fieldsLocked}
               onChange={setPayload}
+              context={{
+                ownerType: file.ownerType,
+                ownerId: file.ownerId,
+                recordKind: file.recordKind,
+                canEdit: canEdit && !partiallySigned,
+              }}
             />
           ) : null}
 
@@ -287,7 +313,24 @@ export function ProcessingModal({ file, initialStep, canEdit, onClose }: Props) 
                 {confirmRevise ? 'Confirm revise' : 'Revise form'}
               </button>
             ) : null}
-            {canEdit && !locked ? (
+            {canEdit && partiallySigned ? (
+              <button
+                type="button"
+                className="rounded-md border border-red-200 px-3 py-2 text-sm text-danger"
+                disabled={clearSignatures.isPending}
+                onClick={() => {
+                  if (confirmClearSignatures) clearSignatures.mutate()
+                  else setConfirmClearSignatures(true)
+                }}
+              >
+                {confirmClearSignatures
+                  ? 'Confirm clear signatures'
+                  : clearSignatures.isPending
+                    ? 'Clearing…'
+                    : 'Clear signatures to edit'}
+              </button>
+            ) : null}
+            {canEdit && !locked && !partiallySigned ? (
               <button
                 type="button"
                 className="rounded-md bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"

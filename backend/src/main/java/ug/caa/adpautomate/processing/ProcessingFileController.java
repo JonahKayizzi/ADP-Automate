@@ -1,6 +1,9 @@
 package ug.caa.adpautomate.processing;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,11 +68,25 @@ public class ProcessingFileController {
     return processingFileService.revise(fileId, formId);
   }
 
+  @PostMapping("/{fileId}/forms/{formId}/clear-signatures")
+  public FormDetail clearSignatures(@PathVariable UUID fileId, @PathVariable UUID formId) {
+    return processingFileService.clearSignatures(fileId, formId);
+  }
+
   @GetMapping("/{fileId}/forms/{formId}/revisions")
   public List<FormRevisionResponse> listRevisions(
       @PathVariable UUID fileId,
       @PathVariable UUID formId
   ) {
     return processingFileService.listRevisions(fileId, formId);
+  }
+
+  @GetMapping("/{fileId}/forms/{formId}/export.pdf")
+  public ResponseEntity<byte[]> exportPdf(@PathVariable UUID fileId, @PathVariable UUID formId) {
+    byte[] pdf = processingFileService.exportOf82Pdf(fileId, formId);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"OF82-raw-data-quality-check.pdf\"")
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(pdf);
   }
 }

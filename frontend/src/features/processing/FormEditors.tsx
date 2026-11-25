@@ -1,3 +1,9 @@
+import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { InlineSlotAttach } from '@/features/attachments/InlineSlotAttach'
+import * as attachmentsApi from '@/services/attachmentsApi'
+import type { AttachmentSlot } from '@/types/attachment'
+import type { ProcessingOwnerType } from '@/types/processing'
 import { calculateConfidence } from './confidence'
 import {
   Field,
@@ -13,11 +19,38 @@ import {
   yesNoOptions,
 } from './formControls'
 
+export type FormEditorContext = {
+  ownerType: ProcessingOwnerType
+  ownerId: string
+  recordKind: string
+  canEdit: boolean
+}
+
+const AIP_SLOT_LABELS: Record<string, string> = {
+  promulgation: 'Signed promulgation form',
+  data_collection: 'Data collection form',
+  coordinate_verification: 'Coordinate verification file',
+  metadata_form: 'Meta data form',
+  safety_assessment: 'Safety assessment (if exists)',
+  regulator_approval: 'Regulator approval (if required)',
+}
+
+const REMOVED_AIP_ITEMS = new Set([
+  'Meta data for AIP',
+  'Approval from the regulator if required',
+])
+
 type Props = {
   formCode: string
   payload: Record<string, unknown>
   locked: boolean
   onChange: (next: Record<string, unknown>) => void
+  context?: FormEditorContext
+}
+
+function isAipRecord(recordKind: string) {
+  const upper = recordKind.toUpperCase()
+  return upper.includes('AMDT') || (upper.includes('AIP') && !upper.includes('SUP'))
 }
 
 type CompletenessRow = { item: string; column?: string; value: string }
@@ -41,9 +74,9 @@ type Part1Row = {
   by: string
 }
 
-export function FormEditor({ formCode, payload, locked, onChange }: Props) {
+export function FormEditor({ formCode, payload, locked, onChange, context }: Props) {
   if (formCode.endsWith('/OF/82')) {
-    return <Of82 payload={payload} locked={locked} onChange={onChange} />
+    return <Of82 payload={payload} locked={locked} onChange={onChange} context={context} />
   }
   if (formCode.endsWith('/OF/83a')) {
     return <Of83a payload={payload} locked={locked} onChange={onChange} />
@@ -66,7 +99,7 @@ function ConfidenceBanner({ payload }: { payload: Record<string, unknown> }) {
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
       <p className="text-sm font-semibold text-ink">
-        Confidence level {result.percent}%
+        Calculated from checks {result.percent}%
       </p>
       <p className="mt-1 text-xs text-muted">
         {result.scored100} of {result.scoredTotal} checks scored at 100%
@@ -77,28 +110,135 @@ function ConfidenceBanner({ payload }: { payload: Record<string, unknown> }) {
   )
 }
 
-function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
-  const completeness = asArray<CompletenessRow>(payload.completeness)
+const AIP_AUTO_ITEMS: Record<string, string> = {
+  'All source data received': 'data_collection',
+  'Coordinates verified': 'coordinate_verification',
+  'Effective dates confirmed': 'metadata_form',
+  'Layout / format reviewed': 'metadata_form',
+  'Signed promulgation form': 'promulgation',
+  'Safety assessment if required': 'safety_assessment',
+}
+
+function parseConfidencePercent(raw: unknown): number {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.min(100, Math.max(0, Math.round(raw)))
+  const s = asString(raw).replace('%', '').trim()
+  const n = Number(s)
+  if (!Number.isFinite(n)) return 0
+  return Math.min(100, Math.max(0, Math.round(n)))
+}
+
+function Of82({
+  payload,
+  locked,
+  onChange,
+  context,
+}: Omit<Props, 'formCode'>) {
+  const completeness = asArray<CompletenessRow>(payload.completeness).filter(
+    (row) =>
+      !/^cross[-\s]?references?\s+checked$/i.test(row.item) && !REMOVED_AIP_ITEMS.has(row.item)
+  )
   const aixm = asArray<AixmRow>(payload.aixmChecklist)
   const aixmIncluded = asBool(payload.aixmIncluded)
   const column = completeness[0]?.column
+  const aip = context ? isAipRecord(context.recordKind) : false
+
+  const attachments = useQuery({
+    queryKey: ['attachments', context?.ownerType, context?.ownerId],
+    queryFn: () => attachmentsApi.listAttachments(context!.ownerType, context!.ownerId),
+    enabled: Boolean(aip && context?.ownerType && context?.ownerId),
+  })
+
+  const attachedSlots = new Set(
+    (attachments.data ?? []).map((a) => a.slot).filter((s): s is string => Boolean(s))
+  )
+  const hasPromulgation = !aip || attachedSlots.has('promulgation')
+  const fieldsLocked = locked || (aip && !hasPromulgation)
+  const canAttach = Boolean(context?.canEdit) && !locked
+
+  function slotAttach(slot: AttachmentSlot) {
+    if (!aip || !context) return null
+    return (
+      <InlineSlotAttach
+        ownerType={context.ownerType}
+        ownerId={context.ownerId}
+        slot={slot}
+        label={AIP_SLOT_LABELS[slot] ?? slot}
+        canEdit={canAttach}
+        hint={
+          slot === 'safety_assessment'
+            ? 'Attach if a safety assessment exists'
+            : slot === 'regulator_approval'
+              ? 'Attach if regulator approval is required'
+              : slot === 'metadata_form'
+                ? 'Marks effective dates and layout/format at 100%'
+                : 'Not attached'
+        }
+      />
+    )
+  }
+
+  useEffect(() => {
+    if (!aip || locked) return
+    const next = completeness.map((row) => {
+      const slot = AIP_AUTO_ITEMS[row.item]
+      if (slot && attachedSlots.has(slot)) {
+        return row.value === '100%' ? row : { ...row, value: '100%' }
+      }
+      return row
+    })
+    const changed = next.some((row, i) => row.value !== completeness[i]?.value)
+    if (changed) {
+      onChange({ ...payload, completeness: next, confidenceManual: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync from attachment signals only
+  }, [aip, locked, attachedSlots.size, attachments.dataUpdatedAt])
+
+  const confidence = parseConfidencePercent(payload.confidenceLevel)
+
+  function completenessDisabled(item: string) {
+    if (fieldsLocked) return true
+    if (!aip) return false
+    const slot = AIP_AUTO_ITEMS[item]
+    if (slot && attachedSlots.has(slot)) return true
+    return false
+  }
 
   return (
     <div className="space-y-5">
+      {aip && !hasPromulgation ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+          Attach a <strong>signed promulgation form</strong> under Completeness before you can update
+          this raw data quality check.
+        </div>
+      ) : null}
+
       <section className="space-y-3">
         <h3 className="font-display text-base font-semibold">Analysis of raw data</h3>
         <Field label="Findings">
-          <TextArea value={asString(payload.findings)} disabled={locked} onChange={(v) => set(payload, 'findings', v, onChange)} />
+          <TextArea
+            value={asString(payload.findings)}
+            disabled={fieldsLocked}
+            onChange={(v) => set(payload, 'findings', v, onChange)}
+          />
         </Field>
       </section>
 
       <section className="grid gap-3 compact:grid-cols-1 nav:grid-cols-2">
         <h3 className="font-display text-base font-semibold nav:col-span-2">Approval</h3>
         <Field label="Approver">
-          <TextInput value={asString(payload.approver)} disabled={locked} onChange={(v) => set(payload, 'approver', v, onChange)} />
+          <TextInput
+            value={asString(payload.approver)}
+            disabled={fieldsLocked}
+            onChange={(v) => set(payload, 'approver', v, onChange)}
+          />
         </Field>
         <Field label="Date of approval">
-          <TextInput type="date" value={asString(payload.approvalDate)} disabled={locked} onChange={(v) => set(payload, 'approvalDate', v, onChange)} />
+          <TextInput
+            type="date"
+            value={asString(payload.approvalDate)}
+            disabled={fieldsLocked}
+            onChange={(v) => set(payload, 'approvalDate', v, onChange)}
+          />
         </Field>
       </section>
 
@@ -106,39 +246,66 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
         <h3 className="font-display text-base font-semibold">Quality check</h3>
         {(
           [
-            ['accuracy', 'Accuracy'],
-            ['resolution', 'Resolution'],
-            ['traceability', 'Traceability'],
-            ['timeliness', 'Timeliness'],
-            ['format', 'Format'],
+            ['accuracy', 'accuracyComment', 'Accuracy'],
+            ['resolution', 'resolutionComment', 'Resolution'],
+            ['traceability', 'traceabilityComment', 'Traceability'],
+            ['timeliness', 'timelinessComment', 'Timeliness'],
+            ['format', 'formatComment', 'Format'],
           ] as const
-        ).map(([key, label]) => (
-          <Field key={key} label={label}>
+        ).map(([key, commentKey, label]) => (
+          <div
+            key={key}
+            className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2"
+          >
+            <p className="w-28 shrink-0 text-sm font-semibold">{label}</p>
             <PillGroup
               value={asString(payload[key])}
               options={pctOptions}
-              disabled={locked}
+              disabled={fieldsLocked}
               onChange={(v) => set(payload, key, v, onChange)}
             />
-          </Field>
+            <div className="min-w-[12rem] flex-1">
+              <TextInput
+                value={asString(payload[commentKey])}
+                disabled={fieldsLocked}
+                onChange={(v) => set(payload, commentKey, v, onChange)}
+                placeholder="Comment"
+              />
+            </div>
+          </div>
         ))}
-        <Field label="Integrity">
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+          <p className="w-28 shrink-0 text-sm font-semibold">Integrity</p>
           <PillGroup
             value={asString(payload.integrity)}
             options={integrityOptions}
-            disabled={locked}
+            disabled={fieldsLocked}
             onChange={(v) => set(payload, 'integrity', v, onChange)}
           />
-        </Field>
+        </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Date received">
-            <TextInput type="date" value={asString(payload.dateReceived)} disabled={locked} onChange={(v) => set(payload, 'dateReceived', v, onChange)} />
+            <TextInput
+              type="date"
+              value={asString(payload.dateReceived)}
+              disabled={fieldsLocked}
+              onChange={(v) => set(payload, 'dateReceived', v, onChange)}
+            />
           </Field>
           <Field label="Publication date">
-            <TextInput type="date" value={asString(payload.publicationDate)} disabled={locked} onChange={(v) => set(payload, 'publicationDate', v, onChange)} />
+            <TextInput
+              type="date"
+              value={asString(payload.publicationDate)}
+              disabled={fieldsLocked}
+              onChange={(v) => set(payload, 'publicationDate', v, onChange)}
+            />
           </Field>
           <Field label="File type">
-            <TextInput value={asString(payload.fileType)} disabled={locked} onChange={(v) => set(payload, 'fileType', v, onChange)} />
+            <TextInput
+              value={asString(payload.fileType)}
+              disabled={fieldsLocked}
+              onChange={(v) => set(payload, 'fileType', v, onChange)}
+            />
           </Field>
         </div>
       </section>
@@ -147,28 +314,59 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
         <h3 className="font-display text-base font-semibold">
           Completeness{column ? ` (${column})` : ''}
         </h3>
-        {completeness.map((row, idx) => (
-          <div key={row.item} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2">
-            <p className="text-sm font-medium">{row.item}</p>
-            <PillGroup
-              value={row.value}
-              options={pctNaOptions}
-              disabled={locked}
-              onChange={(v) => {
-                const next = completeness.map((r, i) => (i === idx ? { ...r, value: v } : r))
-                set(payload, 'completeness', next, onChange)
-              }}
-            />
-          </div>
-        ))}
+        {aip ? (
+          <p className="text-xs text-muted">
+            Attach the related form beside each check. One Meta data form marks both effective dates
+            and layout/format. Attached files appear under Production files on the publication.
+          </p>
+        ) : null}
+        {completeness.map((row, idx) => {
+          const slot = AIP_AUTO_ITEMS[row.item] as AttachmentSlot | undefined
+          // Meta data form attach shown once on Effective dates (also covers layout/format).
+          const showInlineAttach =
+            aip && slot && row.item !== 'Layout / format reviewed'
+          return (
+            <div key={row.item} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{row.item}</p>
+                  {aip && row.item === 'Layout / format reviewed' ? (
+                    <p className="text-[11px] text-muted">Uses the Meta data form attachment above</p>
+                  ) : null}
+                  {aip && completenessDisabled(row.item) && !fieldsLocked ? (
+                    <p className="text-[11px] text-muted">Set automatically from attachment</p>
+                  ) : null}
+                </div>
+                <PillGroup
+                  value={row.value}
+                  options={pctNaOptions}
+                  disabled={completenessDisabled(row.item)}
+                  onChange={(v) => {
+                    const next = completeness.map((r, i) => (i === idx ? { ...r, value: v } : r))
+                    set(payload, 'completeness', next, onChange)
+                  }}
+                />
+              </div>
+              {showInlineAttach && slot ? slotAttach(slot) : null}
+            </div>
+          )
+        })}
       </section>
+
+      {aip ? (
+        <section className="space-y-2">
+          <h3 className="font-display text-base font-semibold">Regulator approval</h3>
+          <p className="text-xs text-muted">Attach only if regulator approval is required.</p>
+          {slotAttach('regulator_approval')}
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <label className="flex items-center gap-2 text-sm font-semibold">
           <input
             type="checkbox"
             checked={aixmIncluded}
-            disabled={locked}
+            disabled={fieldsLocked}
             onChange={(e) => set(payload, 'aixmIncluded', e.target.checked, onChange)}
           />
           An AIXM file is part of this raw data
@@ -176,12 +374,15 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
         {aixmIncluded ? (
           <div className="space-y-2">
             {aixm.map((row, idx) => (
-              <div key={row.item} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2">
+              <div
+                key={row.item}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2"
+              >
                 <p className="text-sm">{row.item}</p>
                 <PillGroup
                   value={row.value}
                   options={pctNaOptions}
-                  disabled={locked}
+                  disabled={fieldsLocked}
                   onChange={(v) => {
                     const next = aixm.map((r, i) => (i === idx ? { ...r, value: v } : r))
                     set(payload, 'aixmChecklist', next, onChange)
@@ -193,7 +394,29 @@ function Of82({ payload, locked, onChange }: Omit<Props, 'formCode'>) {
         ) : null}
       </section>
 
-      <ConfidenceBanner payload={payload} />
+      <section className="space-y-3 rounded-md border border-slate-200 bg-white px-4 py-3">
+        <h3 className="font-display text-base font-semibold">Confidence level</h3>
+        <div className="flex flex-wrap items-center gap-4">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={confidence}
+            disabled={fieldsLocked}
+            className="min-w-[12rem] flex-1 accent-brand"
+            onChange={(e) =>
+              onChange({
+                ...payload,
+                confidenceManual: true,
+                confidenceLevel: `${e.target.value}%`,
+              })
+            }
+          />
+          <span className="font-mono text-sm font-semibold tabular-nums">{confidence}%</span>
+        </div>
+        <ConfidenceBanner payload={payload} />
+      </section>
     </div>
   )
 }

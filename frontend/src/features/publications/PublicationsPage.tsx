@@ -268,12 +268,34 @@ export function PublicationsPage() {
                 label={pub.type.replace(/^AIRAC /, '')}
               />
             ) : null}
-            <AttachmentsPanel
-              ownerType="publication"
-              ownerId={pub.id}
-              canEdit={canEdit}
-              slots={[{ key: 'publication', label: 'Publication file' }]}
-            />
+            <div className="mt-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                Production files
+              </h3>
+              <p className="mb-2 text-[11px] text-muted">
+                Attach the publication product here. Promulgation, data collection, coordinate
+                verification, meta data form, safety assessment, and regulator approval are attached
+                inside the raw data quality check form and then listed below.
+              </p>
+              <AttachmentsPanel
+                ownerType="publication"
+                ownerId={pub.id}
+                canEdit={canEdit}
+                hideEmpty
+                layout="rows"
+                attachableSlots={['publication']}
+                emptyHint="No production files attached yet."
+                slots={[
+                  { key: 'publication', label: 'Publication file' },
+                  { key: 'promulgation', label: 'Signed promulgation form' },
+                  { key: 'data_collection', label: 'Data collection form' },
+                  { key: 'coordinate_verification', label: 'Coordinate verification' },
+                  { key: 'metadata_form', label: 'Meta data form' },
+                  { key: 'safety_assessment', label: 'Safety assessment' },
+                  { key: 'regulator_approval', label: 'Regulator approval' },
+                ]}
+              />
+            </div>
           </article>
         ))}
       </div>

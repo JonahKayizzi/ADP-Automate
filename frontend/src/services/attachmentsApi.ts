@@ -32,10 +32,22 @@ export async function uploadAttachment(
   })
 
   const text = await res.text()
-  const data = text ? JSON.parse(text) : null
+  let data: { detail?: string; title?: string; message?: string } | null = null
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      data = null
+    }
+  }
   if (!res.ok) {
     const detail =
-      (data && (data.detail || data.title || data.message)) || 'Could not upload the file.'
+      (data && (data.detail || data.title || data.message)) ||
+      (res.status === 401
+        ? 'Your session expired. Sign in again, then retry the upload.'
+        : res.status === 403
+          ? 'You do not have permission to upload files.'
+          : 'Could not upload the file.')
     throw new ApiError(res.status, String(detail))
   }
   return data as Attachment
