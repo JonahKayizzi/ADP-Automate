@@ -35,6 +35,16 @@ public class AttachmentService {
   private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
       "pdf", "txt", "csv", "json", "xml", "gml", "md", "png", "jpg", "jpeg"
   );
+  /** Publication production-file slots used by OF/82 AIP completeness. */
+  public static final Set<String> PUBLICATION_SLOTS = Set.of(
+      "publication",
+      "promulgation",
+      "data_collection",
+      "coordinate_verification",
+      "metadata_form",
+      "safety_assessment",
+      "regulator_approval"
+  );
   private static final Map<String, String> DEFAULT_CONTENT_TYPES = Map.ofEntries(
       Map.entry("pdf", "application/pdf"),
       Map.entry("txt", "text/plain"),
@@ -214,10 +224,14 @@ public class AttachmentService {
         if (slot == null || "publication".equals(slot) || "file".equals(slot)) {
           yield "publication";
         }
+        if (PUBLICATION_SLOTS.contains(slot)) {
+          yield slot;
+        }
         throw new ApiException(
             HttpStatus.BAD_REQUEST,
             "validation",
-            "Publication slot must be publication.",
+            "Publication slot must be one of: publication, promulgation, data_collection, "
+                + "coordinate_verification, metadata_form, safety_assessment, regulator_approval.",
             "slot"
         );
       }
